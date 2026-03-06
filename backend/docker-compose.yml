@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: paddle_db
+    restart: always
+    environment:
+      POSTGRES_USER: paddle_admin
+      POSTGRES_PASSWORD: password1234
+      POSTGRES_DB: paddle_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    container_name: paddle_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
