@@ -11,4 +11,5 @@ interface MatchPlayerRepository : JpaRepository<MatchPlayer, UUID> {
 
     fun findByPlayerId(playerId: UUID): List<MatchPlayer>
 
+    fun findByMatchIdAndPlayerId(matchId: UUID, playerId: UUID): MatchPlayer?
 }

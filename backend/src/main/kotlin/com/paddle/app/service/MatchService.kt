@@ -4,18 +4,24 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
 import com.paddle.app.dto.toResponseDTO
+import com.paddle.app.model.Club
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchPlayer
+import com.paddle.app.model.User
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
 import com.paddle.app.repository.UserRepository
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.Duration
+import java.time.OffsetDateTime
 import java.util.UUID
 
 
@@ -24,23 +30,23 @@ class MatchService(
     private val matchRepository: MatchRepository,
     private val userRepository: UserRepository,
     private val clubRepository: ClubRepository,
-    private val matchPlayerRepository: MatchPlayerRepository) {
+    private val matchPlayerRepository: MatchPlayerRepository,
+    private val clock: Clock
+    ) {
 
     companion object {
         const val STATUS_OPEN = "OPEN"
         const val STATUS_CLOSED = "CLOSED"
+        const val STATUS_CANCELLED = "CANCELLED"
         const val MATCH_NOT_FOUND_MESSAGE = "Match not found"
         const val USER_NOT_FOUND_MESSAGE = "User not found"
         const val MATCH_NOT_OPEN_MESSAGE = "Match is not open"
-        const val HOST_USER_NOT_FOUND_MESSAGE = "Host user not found"
         const val CLUB_NOT_FOUND_MESSAGE = "Club not found"
     }
 
     fun getNearbyOpenMatches(latitude: Double, longitude: Double, radiusMeters: Double): List<MatchResponseDTO> {
 
-        val geometryFactory = GeometryFactory(PrecisionModel(), 4326)
-        val coordinate = Coordinate(longitude, latitude)
-        val userLocationPoint = geometryFactory.createPoint(coordinate)
+        val userLocationPoint = createPointFromCoordinates(longitude, latitude)
 
         return matchRepository.findNearbyMatches(STATUS_OPEN, userLocationPoint, radiusMeters).map { it.toResponseDTO() }
     }
@@ -60,11 +66,8 @@ class MatchService(
     }
 
     fun createMatch(request: MatchCreateRequestDTO): MatchResponseDTO {
-        val host = userRepository.findByIdOrNull(request.hostId)
-            ?: throw IllegalArgumentException(HOST_USER_NOT_FOUND_MESSAGE)
-
-        val club = clubRepository.findByIdOrNull(request.clubId)
-            ?: throw IllegalArgumentException(CLUB_NOT_FOUND_MESSAGE)
+        val host = findUserById(request.hostId)
+        val club = findClubById(request.clubId)
 
         val newMatch = Match(
             host = host,
@@ -85,13 +88,10 @@ class MatchService(
     }
 
     fun joinMatch(matchId: UUID, userId: UUID) {
-        val match = matchRepository.findByIdOrNull(matchId)
-            ?: throw IllegalArgumentException(MATCH_NOT_FOUND_MESSAGE)
+        val match = findMatchById(matchId)
+        val user = findUserById(userId)
 
-        val user = userRepository.findByIdOrNull(userId)
-            ?: throw IllegalArgumentException(USER_NOT_FOUND_MESSAGE)
-
-        if (match.status != STATUS_OPEN) throw IllegalArgumentException(MATCH_NOT_OPEN_MESSAGE)
+        assertMatchIsOpen(match)
 
         val reservation = MatchPlayer(match = match, player = user)
 
@@ -100,6 +100,78 @@ class MatchService(
 
     }
 
+    fun leaveMatch(matchId: UUID, userId: UUID) {
+        val match = findMatchById(matchId)
+        findUserById(userId)
 
+        if(match.host.id == userId) throw IllegalArgumentException("Host cannot leave the match")
+
+        val matchPlayer = matchPlayerRepository.findByMatchIdAndPlayerId(matchId, userId) ?:
+        throw IllegalArgumentException("User is not a player in this match")
+
+        val timeUntilMatch = calculateTimeUntilMatch(match)
+
+        if (timeUntilMatch.toMinutes() <= 120) {
+            // TODO: apply penalty
+        }
+
+        matchPlayerRepository.delete(matchPlayer)
+    }
+
+    fun cancelMatch(matchId: UUID, userId: UUID) {
+        val match = findMatchById(matchId)
+        findUserById(userId)
+
+        if (match.host.id != userId) throw SecurityException("Only the host can cancel the match")
+
+        assertMatchIsOpen(match)
+
+        val timeUntilMatch = calculateTimeUntilMatch(match)
+        if (timeUntilMatch.toMinutes() <= 120) {
+            // TODO: apply penalty
+        }
+
+        match.status = STATUS_CANCELLED
+        matchRepository.save(match)
+
+        // TODO: Fetch matchPlayerRepository.findByMatchId(matchId) and send push notifications to other users
+    }
+
+
+
+
+
+    private fun calculateTimeUntilMatch(match: Match): Duration {
+        val now = OffsetDateTime.now(clock)
+        val timeUntilMatch = Duration.between(now, match.matchDate)
+        return timeUntilMatch
+    }
+
+    private fun findUserById(userId: UUID): User {
+        return (userRepository.findByIdOrNull(userId)
+            ?: throw IllegalArgumentException(USER_NOT_FOUND_MESSAGE))
+    }
+
+    private fun findClubById(clubId: UUID): Club {
+        return (clubRepository.findByIdOrNull(clubId)
+            ?: throw IllegalArgumentException(CLUB_NOT_FOUND_MESSAGE))
+    }
+
+    private fun assertMatchIsOpen(match: Match) {
+        if (match.status != STATUS_OPEN) throw IllegalArgumentException(MATCH_NOT_OPEN_MESSAGE)
+    }
+
+    private fun findMatchById(matchId: UUID): Match {
+        val match = matchRepository.findByIdOrNull(matchId)
+            ?: throw IllegalArgumentException(MATCH_NOT_FOUND_MESSAGE)
+        return match
+    }
+
+    private fun createPointFromCoordinates(longitude: Double, latitude: Double): Point {
+        val geometryFactory = GeometryFactory(PrecisionModel(), 4326)
+        val coordinate = Coordinate(longitude, latitude)
+        val userLocationPoint = geometryFactory.createPoint(coordinate)
+        return userLocationPoint
+    }
 
 }
