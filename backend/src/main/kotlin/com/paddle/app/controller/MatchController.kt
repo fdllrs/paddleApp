@@ -22,9 +22,11 @@ class MatchController(private val matchService: MatchService) {
     @GetMapping("/nearby")
     fun getNearbyMatches(@RequestParam latitude: Double,
                          @RequestParam longitude: Double,
-                         @RequestParam radiusMeters: Double): List<MatchResponseDTO> {
+                         @RequestParam radiusMeters: Double,
+                         @RequestParam targetDivision: Int
+                         ): List<MatchResponseDTO> {
 
-        return matchService.getNearbyOpenMatches(latitude, longitude, radiusMeters)
+        return matchService.getNearbyOpenMatches(latitude, longitude, radiusMeters, targetDivision)
     }
 
     @GetMapping("/{matchId}/players")

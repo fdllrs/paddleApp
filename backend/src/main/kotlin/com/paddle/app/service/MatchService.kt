@@ -44,11 +44,15 @@ class MatchService(
         const val CLUB_NOT_FOUND_MESSAGE = "Club not found"
     }
 
-    fun getNearbyOpenMatches(latitude: Double, longitude: Double, radiusMeters: Double): List<MatchResponseDTO> {
+    fun getNearbyOpenMatches(
+        latitude: Double,
+        longitude: Double,
+        radiusMeters: Double,
+        targetDivision: Int): List<MatchResponseDTO> {
 
         val userLocationPoint = createPointFromCoordinates(longitude, latitude)
 
-        return matchRepository.findNearbyMatches(STATUS_OPEN, userLocationPoint, radiusMeters).map { it.toResponseDTO() }
+        return matchRepository.findNearbyMatches(STATUS_OPEN, userLocationPoint, radiusMeters, targetDivision).map { it.toResponseDTO() }
     }
 
     fun getPlayersFromMatch(matchId: UUID): List<UserResponseDTO> {
