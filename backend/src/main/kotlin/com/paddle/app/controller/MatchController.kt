@@ -3,7 +3,6 @@ package com.paddle.app.controller
 import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
-import com.paddle.app.dto.toResponseDTO
 import com.paddle.app.service.MatchService
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
