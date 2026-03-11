@@ -14,9 +14,8 @@ import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
 import io.mockk.verify
-import jakarta.persistence.Id
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -25,9 +24,8 @@ import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.dao.DataIntegrityViolationException
-import java.time.Instant
+import org.springframework.data.repository.findByIdOrNull
 import java.time.OffsetDateTime
-import java.time.ZoneId
 import java.util.UUID
 import java.util.Optional
 
@@ -43,8 +41,6 @@ class MatchServiceTest {
     private lateinit var clubRepository: ClubRepository
     @MockK
     private lateinit var matchPlayerRepository: MatchPlayerRepository
-    @MockK
-    private lateinit var clock: java.time.Clock
 
     @InjectMockKs
     private lateinit var matchService: MatchService
@@ -260,17 +256,13 @@ class MatchServiceTest {
             every { matchRepository.findById(matchId) } returns Optional.of(match)
             every { userRepository.findById(hostId) } returns Optional.of(host)
             every { userRepository.findById(userId) } returns Optional.of(user)
-            every { matchPlayerRepository.save(any()) } throws DataIntegrityViolationException("User already joined this match.")
+            every { matchPlayerRepository.save(any()) } throws DataIntegrityViolationException(MatchService.USER_ALREADY_IN_MATCH_MESSAGE)
 
             val exception = assertThrows<DataIntegrityViolationException> {
                 matchService.joinMatch(matchId, userId)
             }
 
-
-
-            assertEquals("User already joined this match.", exception.message)
-
-
+            assertEquals(MatchService.USER_ALREADY_IN_MATCH_MESSAGE, exception.message)
         }
 
     }
@@ -283,12 +275,13 @@ class MatchServiceTest {
             val testLatitude = -34.0
             val testLongitude = -58.0
             val testRadiusMeters = 5000.0
+            val testTargetDivision = 7
 
             val mockMatch = mockMatch()
 
-            every { matchRepository.findNearbyMatches(any(), any(), any()) } returns listOf(mockMatch)
+            every { matchRepository.findNearbyMatches(any(), any(), any(), any()) } returns listOf(mockMatch)
 
-            matchService.getNearbyOpenMatches(testLatitude, testLongitude, testRadiusMeters)
+            matchService.getNearbyOpenMatches(testLatitude, testLongitude, testRadiusMeters, testTargetDivision)
 
             verify(exactly = 1) { matchRepository.findNearbyMatches(
                 eq(MatchService.STATUS_OPEN),
@@ -296,7 +289,8 @@ class MatchServiceTest {
                     assertEquals(testLatitude, capturedPoint.y)
                     assertEquals(testLongitude, capturedPoint.x)
                 },
-                eq(testRadiusMeters)
+                eq(testRadiusMeters),
+                eq(testTargetDivision)
             ) }
 
 
@@ -304,35 +298,45 @@ class MatchServiceTest {
     }
 
     @Nested
-    inner class leaveMatchTest{
-        @BeforeEach
-        fun setup(){
-            val fixedTime = Instant.parse("2026-03-08T12:00:00Z")
-            val zoneId = ZoneId.of("UTC")
-
-            every { clock.instant() } returns fixedTime
-            every { clock.zone } returns zoneId
-
-        }
-
+    inner class LeaveMatchTest{
         @Test
-        fun `cancelling a match less than 2 hours before the match should apply a penalization`(){
-            val user = mockUser()
+        fun `match host cannot leave the match`(){
             val host = mockUser()
             val club = mockClub()
-            val match = mockMatch(host, club, OffsetDateTime.now().minusHours(1))
-            val userId = requireNotNull(user.id)
+            val match = mockMatch(host, club)
+
             val matchId = requireNotNull(match.id)
+            val hostId = requireNotNull(host.id)
 
+            every {matchRepository.findById(matchId)} returns Optional.of(match)
+            every { userRepository.findById(hostId) } returns Optional.of(host)
 
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.leaveMatch(matchId, hostId)
+            }
+            assertEquals(MatchService.HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE, exception.message)
 
-
-
-
+            verify(exactly = 0) { matchPlayerRepository.delete(any()) }
 
         }
 
+        fun `player cannot leave a match they are not a part of`(){
+            val player = mockUser()
+            val host = mockUser()
+            val club = mockClub()
+            val match = mockMatch(host, club)
 
+            val matchId = requireNotNull(match.id)
+            val hostId = requireNotNull(host.id)
+
+            every {matchPlayerRepository.findByMatchIdAndPlayerId(any(), any())} returns Optional.empty()
+            every { userRepository.findById(hostId) } returns Optional.of(host)
+
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.leaveMatch(matchId, hostId)
+            }
+            assertEquals(MatchService.USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE, exception.message)
+            verify(exactly = 0) { matchPlayerRepository.delete(any()) }
 
 
 

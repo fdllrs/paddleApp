@@ -25,6 +25,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 
+
 @Service
 class MatchService(
     private val matchRepository: MatchRepository,
@@ -42,6 +43,12 @@ class MatchService(
         const val USER_NOT_FOUND_MESSAGE = "User not found"
         const val MATCH_NOT_OPEN_MESSAGE = "Match is not open"
         const val CLUB_NOT_FOUND_MESSAGE = "Club not found"
+        const val USER_ALREADY_IN_MATCH_MESSAGE = "User is already in this match"
+        const val HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE = "Host cannot leave the match"
+        const val USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE = "User is not a player in this match"
+        const val ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE = "Only the host can cancel the match"
+
+
     }
 
     fun getNearbyOpenMatches(
@@ -108,16 +115,10 @@ class MatchService(
         val match = findMatchById(matchId)
         findUserById(userId)
 
-        if(match.host.id == userId) throw IllegalArgumentException("Host cannot leave the match")
+        if(match.host.id == userId) throw IllegalArgumentException(HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE)
 
         val matchPlayer = matchPlayerRepository.findByMatchIdAndPlayerId(matchId, userId) ?:
-        throw IllegalArgumentException("User is not a player in this match")
-
-        val timeUntilMatch = calculateTimeUntilMatch(match)
-
-        if (timeUntilMatch.toMinutes() <= 120) {
-            // TODO: apply penalty
-        }
+        throw IllegalArgumentException(USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE)
 
         matchPlayerRepository.delete(matchPlayer)
     }
@@ -126,14 +127,9 @@ class MatchService(
         val match = findMatchById(matchId)
         findUserById(userId)
 
-        if (match.host.id != userId) throw SecurityException("Only the host can cancel the match")
+        if (match.host.id != userId) throw SecurityException(ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE)
 
         assertMatchIsOpen(match)
-
-        val timeUntilMatch = calculateTimeUntilMatch(match)
-        if (timeUntilMatch.toMinutes() <= 120) {
-            // TODO: apply penalty
-        }
 
         match.status = STATUS_CANCELLED
         matchRepository.save(match)
