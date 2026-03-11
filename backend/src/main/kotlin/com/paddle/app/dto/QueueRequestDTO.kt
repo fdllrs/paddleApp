@@ -10,5 +10,5 @@ data class QueueRequestDTO(
     val targetDivision: Int,
     val radiusMeters: Double,
     val startTime: OffsetDateTime,
-    val endTime: OffsetDateTime
+    val endTime: OffsetDateTime,
 )
