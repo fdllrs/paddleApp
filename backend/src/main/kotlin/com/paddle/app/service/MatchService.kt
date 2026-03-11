@@ -55,6 +55,7 @@ class MatchService(
         return matchRepository.findNearbyMatches(STATUS_OPEN, userLocationPoint, radiusMeters, targetDivision).map { it.toResponseDTO() }
     }
 
+
     fun getPlayersFromMatch(matchId: UUID): List<UserResponseDTO> {
         val matchPlayers = matchPlayerRepository.findByMatchId(matchId)
 
@@ -141,9 +142,9 @@ class MatchService(
         // TODO: Fetch matchPlayerRepository.findByMatchId(matchId) and send push notifications to other users
     }
 
-
-
-
+    fun isPlayerInMatch(matchId: UUID, playerId: UUID): Boolean {
+        return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == playerId }
+    }
 
     private fun calculateTimeUntilMatch(match: Match): Duration {
         val now = OffsetDateTime.now(clock)

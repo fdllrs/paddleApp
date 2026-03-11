@@ -1,28 +1,67 @@
 package com.paddle.app.service
 
 import com.paddle.app.dto.QueueRequestDTO
+import com.paddle.app.model.MatchmakingTicket
+import com.paddle.app.repository.UserRepository
+import com.paddle.app.repository.MatchmakingTicketRepository
 import java.util.UUID
 import org.springframework.stereotype.Service
+import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.GeometryFactory
 
 @Service
-class MatchmakingService {
-    private val activeQueue = mutableListOf<QueueRequestDTO>()
+class MatchmakingService(
+    private val userRepository: UserRepository,
+    private val matchmakingTicketRepository: MatchmakingTicketRepository,
+    private val geometryFactory: GeometryFactory
+) {
+    companion object {
+        const val STATUS_SEARCHING = "SEARCHING"
+        const val STATUS_CANCELLED = "CANCELLED"
+    }
 
     fun isValidRequest(request: QueueRequestDTO): Boolean {
         return request.endTime.isAfter(request.startTime)
     }
 
-    fun enterQueue(request: QueueRequestDTO) {
-        if (isValidRequest(request)) {
-            activeQueue.add(request)
+    fun joinQueue(request: QueueRequestDTO, userId: UUID): UUID {
+
+        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING)
+        if (existingTicket != null) {
+            throw IllegalStateException("User is already in the matchmaking queue")
         }
+
+        if (!isValidRequest(request)) {
+            throw IllegalArgumentException("The provided queue request is not valid: End time must be after start time.")
+        }
+
+        val user = userRepository.findUserById(userId)
+            ?: throw IllegalArgumentException("User not found")
+
+        val searchLocation = geometryFactory.createPoint(
+            Coordinate(request.longitude, request.latitude)
+        )
+
+        val newMatchmakingTicket = MatchmakingTicket(
+            userId = userId,
+            startTime = request.startTime,
+            endTime = request.endTime,
+            targetDivision = user.division,
+            searchLocation = searchLocation,
+            status = "SEARCHING",
+            maxRadiusMeters = request.radiusMeters,
+        )
+
+        val savedTicket = matchmakingTicketRepository.save(newMatchmakingTicket)
+
+        return savedTicket.id!!
     }
 
     fun isPlayerInQueue(playerID: UUID): Boolean {
-        return activeQueue.any { it.playerId == playerID }
+        return matchmakingTicketRepository.existsByUserId(playerID)
     }
 
     fun queueIsEmpty(): Boolean {
-        return activeQueue.isEmpty()
+        return matchmakingTicketRepository.count() == 0L
     }
 }
