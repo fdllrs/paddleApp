@@ -19,9 +19,6 @@ import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
-import java.time.Duration
-import java.time.OffsetDateTime
 import java.util.UUID
 
 
@@ -32,7 +29,6 @@ class MatchService(
     private val userRepository: UserRepository,
     private val clubRepository: ClubRepository,
     private val matchPlayerRepository: MatchPlayerRepository,
-    private val clock: Clock
     ) {
 
     companion object {
@@ -137,15 +133,6 @@ class MatchService(
         // TODO: Fetch matchPlayerRepository.findByMatchId(matchId) and send push notifications to other users
     }
 
-
-
-
-
-    private fun calculateTimeUntilMatch(match: Match): Duration {
-        val now = OffsetDateTime.now(clock)
-        val timeUntilMatch = Duration.between(now, match.matchDate)
-        return timeUntilMatch
-    }
 
     private fun findUserById(userId: UUID): User {
         return (userRepository.findByIdOrNull(userId)
