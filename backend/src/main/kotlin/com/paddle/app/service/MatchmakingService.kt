@@ -1,19 +1,23 @@
 package com.paddle.app.service
 
 import com.paddle.app.dto.QueueRequestDTO
+import com.paddle.app.model.Club
 import com.paddle.app.model.MatchmakingTicket
+import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.UserRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
 import java.util.UUID
 import org.springframework.stereotype.Service
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.Point
 
 @Service
 class MatchmakingService(
     private val userRepository: UserRepository,
     private val matchmakingTicketRepository: MatchmakingTicketRepository,
-    private val geometryFactory: GeometryFactory
+    private val geometryFactory: GeometryFactory,
+    private val clubRepository: ClubRepository
 ) {
     companion object {
         const val STATUS_SEARCHING = "SEARCHING"
@@ -50,6 +54,23 @@ class MatchmakingService(
         return savedTicket.id!!
     }
 
+    fun getClubsForMatchmaking(p1Loc: Point, p2Loc: Point, p1radius: Double, p2radius: Double): List<Club>{
+        return clubRepository.findClubsInIntersection(
+            p1Loc,
+            p1radius,
+            p2Loc,
+            p2radius
+        )
+    }
+
+    fun isPlayerInQueue(playerID: UUID): Boolean {
+        return matchmakingTicketRepository.existsByUserId(playerID)
+    }
+
+    fun queueIsEmpty(): Boolean {
+        return matchmakingTicketRepository.count() == 0L
+    }
+
     private fun assertQueueJoiningIsValid(userId: UUID, request: QueueRequestDTO) {
         val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING)
         if (existingTicket != null) {
@@ -59,13 +80,5 @@ class MatchmakingService(
         if (!isValidRequest(request)) {
             throw IllegalArgumentException("The provided queue request is not valid: End time must be after start time.")
         }
-    }
-
-    fun isPlayerInQueue(playerID: UUID): Boolean {
-        return matchmakingTicketRepository.existsByUserId(playerID)
-    }
-
-    fun queueIsEmpty(): Boolean {
-        return matchmakingTicketRepository.count() == 0L
     }
 }

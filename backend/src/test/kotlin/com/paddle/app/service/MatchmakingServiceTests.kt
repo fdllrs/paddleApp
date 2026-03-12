@@ -5,6 +5,7 @@ import com.paddle.app.repository.UserRepository
 import com.paddle.app.dto.QueueRequestDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.User
+import com.paddle.app.model.Club
 import io.mockk.every
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -19,7 +20,12 @@ import io.mockk.junit5.MockKExtension
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
-import java.util.Optional
+import com.paddle.app.repository.ClubRepository
+import org.junit.jupiter.api.Assertions.assertNotNull
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import org.springframework.aot.hint.TypeReference.listOf
+
 
 @ExtendWith(MockKExtension::class)
 class MatchmakingServiceTest {
@@ -29,6 +35,9 @@ class MatchmakingServiceTest {
 
     @MockK
     private lateinit var matchmakingTicketRepository: MatchmakingTicketRepository
+
+    @MockK
+    private lateinit var clubRepository: ClubRepository
 
     @SpyK
     private var geometryFactory = GeometryFactory()
@@ -90,5 +99,33 @@ class MatchmakingServiceTest {
         verify(exactly = 1) { matchmakingTicketRepository.save(any()) }
         assertFalse(matchmakingService.queueIsEmpty())
         assertTrue(matchmakingService.isPlayerInQueue(myId))
+    }
+
+    @Test
+    fun `should return a list of clubs found in the intersection of two players`() {
+        val p1Loc = geometryFactory.createPoint(Coordinate(40.4168, -3.7038))
+        val p2Loc = geometryFactory.createPoint(Coordinate(40.4200, -3.7100))
+        val radius = 2000.0
+
+        val expectedClub = Club(
+            id = UUID.randomUUID(),
+            name = "Central Padel",
+            location = geometryFactory.createPoint(Coordinate(40.4180, -3.7050)),
+            address = "Central Padel address"
+        )
+
+        every {
+            clubRepository.findClubsInIntersection(p1Loc, radius, p2Loc, radius)
+        } returns listOf(expectedClub)
+
+        val result = matchmakingService.getClubsForMatchmaking(p1Loc, p2Loc, radius, radius)
+
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("Central Padel", result[0].name)
+
+        verify(exactly = 1) {
+            clubRepository.findClubsInIntersection(p1Loc, radius, p2Loc, radius)
+        }
     }
 }
