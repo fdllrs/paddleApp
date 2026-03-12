@@ -26,14 +26,7 @@ class MatchmakingService(
 
     fun joinQueue(request: QueueRequestDTO, userId: UUID): UUID {
 
-        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING)
-        if (existingTicket != null) {
-            throw IllegalStateException("User is already in the matchmaking queue")
-        }
-
-        if (!isValidRequest(request)) {
-            throw IllegalArgumentException("The provided queue request is not valid: End time must be after start time.")
-        }
+        assertQueueJoiningIsValid(userId, request)
 
         val user = userRepository.findUserById(userId)
             ?: throw IllegalArgumentException("User not found")
@@ -55,6 +48,17 @@ class MatchmakingService(
         val savedTicket = matchmakingTicketRepository.save(newMatchmakingTicket)
 
         return savedTicket.id!!
+    }
+
+    private fun assertQueueJoiningIsValid(userId: UUID, request: QueueRequestDTO) {
+        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING)
+        if (existingTicket != null) {
+            throw IllegalStateException("User is already in the matchmaking queue")
+        }
+
+        if (!isValidRequest(request)) {
+            throw IllegalArgumentException("The provided queue request is not valid: End time must be after start time.")
+        }
     }
 
     fun isPlayerInQueue(playerID: UUID): Boolean {
