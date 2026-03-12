@@ -149,12 +149,6 @@ class MatchService(
         return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == playerId }
     }
 
-    private fun calculateTimeUntilMatch(match: Match): Duration {
-        val now = OffsetDateTime.now(clock)
-        val timeUntilMatch = Duration.between(now, match.matchDate)
-        return timeUntilMatch
-    }
-
     private fun findUserById(userId: UUID): User {
         return (userRepository.findByIdOrNull(userId)
             ?: throw IllegalArgumentException(USER_NOT_FOUND_MESSAGE))

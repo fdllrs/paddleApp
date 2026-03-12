@@ -126,6 +126,10 @@ class MatchServiceTest {
         every { matchRepository.findById(requireNotNull(match.id)) } returns Optional.of(match)
     }
 
+    private fun givenMatchPlayerExists(matchPlayer: MatchPlayer) {
+        every { matchPlayerRepository.findById(requireNotNull(matchPlayer.id)) } returns Optional.of(matchPlayer)
+    }
+
     private fun givenUserMissing(userId: UUID) {
         every { userRepository.findById(userId) } returns Optional.empty()
     }
@@ -156,7 +160,10 @@ class MatchServiceTest {
             givenUserExists(host)
             givenClubExists(club)
             givenMatchExists(match)
+
+
             every { matchRepository.save(any()) } returns match
+            every { matchPlayerRepository.findByMatchId(match.id!!) } returns listOf(testMatchPlayer(player = host, match = match))
             every { matchPlayerRepository.save(any()) } returns mockk()
 
             // Act
@@ -207,6 +214,7 @@ class MatchServiceTest {
             givenUserExists(player)
             givenMatchExists(match)
             every { matchPlayerRepository.save(any()) } returns mockk()
+            every { matchPlayerRepository.findByMatchId(match.id!!) } returns listOf(testMatchPlayer(player = host, match = match))
 
             // Act
             matchService.joinMatch(requireNotNull(match.id), requireNotNull(player.id))
