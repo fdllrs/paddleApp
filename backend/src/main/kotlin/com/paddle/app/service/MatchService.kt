@@ -33,8 +33,6 @@ class MatchService(
     ) {
 
     companion object {
-        const val STATUS_CLOSED = "CLOSED"
-        const val STATUS_CANCELLED = "CANCELLED"
         const val MATCH_NOT_FOUND_MESSAGE = "Match not found"
         const val USER_NOT_FOUND_MESSAGE = "User not found"
         const val MATCH_FULL_MESSAGE = "Match is full"
