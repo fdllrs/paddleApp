@@ -19,9 +19,6 @@ import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
-import java.time.Duration
-import java.time.OffsetDateTime
 import java.util.UUID
 
 
@@ -32,7 +29,6 @@ class MatchService(
     private val userRepository: UserRepository,
     private val clubRepository: ClubRepository,
     private val matchPlayerRepository: MatchPlayerRepository,
-    private val clock: Clock
     ) {
 
     companion object {
@@ -138,7 +134,7 @@ class MatchService(
         val match = findMatchById(matchId)
         findUserById(userId)
 
-        if (match.host.id != userId) throw SecurityException("Only the host can cancel the match")
+        if (match.host.id != userId) throw SecurityException(ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE)
 
         assertMatchIsOpen(match)
 
