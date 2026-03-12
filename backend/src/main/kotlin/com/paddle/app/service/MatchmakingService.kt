@@ -22,6 +22,7 @@ class MatchmakingService(
     companion object {
         const val STATUS_SEARCHING = "SEARCHING"
         const val STATUS_CANCELLED = "CANCELLED"
+        const val STATUS_MATCHED = "MATCHED"
     }
 
     fun isValidRequest(request: QueueRequestDTO): Boolean {
@@ -45,13 +46,22 @@ class MatchmakingService(
             endTime = request.endTime,
             targetDivision = user.division,
             searchLocation = searchLocation,
-            status = "SEARCHING",
+            status = STATUS_SEARCHING,
             maxRadiusMeters = request.radiusMeters,
         )
 
         val savedTicket = matchmakingTicketRepository.save(newMatchmakingTicket)
 
         return savedTicket.id!!
+    }
+
+    fun leaveQueue(userId: UUID, status: String) {
+        val ticket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING) ?:
+        throw IllegalArgumentException("User is not in the matchmaking queue")
+
+        ticket.status = status
+
+        matchmakingTicketRepository.save(ticket)
     }
 
     fun getClubsForMatchmaking(p1Loc: Point, p2Loc: Point, p1radius: Double, p2radius: Double): List<Club>{

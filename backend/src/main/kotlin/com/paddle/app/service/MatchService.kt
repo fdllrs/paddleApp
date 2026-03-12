@@ -36,6 +36,7 @@ class MatchService(
 
     companion object {
         const val STATUS_OPEN = "OPEN"
+        const val STATUS_FULL = "FULL"
         const val STATUS_CLOSED = "CLOSED"
         const val STATUS_CANCELLED = "CANCELLED"
         const val MATCH_NOT_FOUND_MESSAGE = "Match not found"
@@ -60,6 +61,12 @@ class MatchService(
         val matchPlayers = matchPlayerRepository.findByMatchId(matchId)
 
         return matchPlayers.map {it.player.toResponseDTO()}
+
+    }
+
+    fun numberOfPlayersInMatch(matchId: UUID): Int {
+        val matchPlayers = matchPlayerRepository.findByMatchId(matchId)
+        return matchPlayers.count()
 
     }
 
