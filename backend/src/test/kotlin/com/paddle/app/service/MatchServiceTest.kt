@@ -3,15 +3,18 @@ package com.paddle.app.service
 import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.model.Club
 import com.paddle.app.model.Match
+import com.paddle.app.model.MatchPlayer
 import com.paddle.app.model.User
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
 import com.paddle.app.repository.UserRepository
+import io.mockk.Runs
 import io.mockk.every
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions
@@ -35,10 +38,13 @@ class MatchServiceTest {
     // 1. Mock the dependencies (The Database layer)
     @MockK
     private lateinit var matchRepository: MatchRepository
+
     @MockK
     private lateinit var userRepository: UserRepository
+
     @MockK
     private lateinit var clubRepository: ClubRepository
+
     @MockK
     private lateinit var matchPlayerRepository: MatchPlayerRepository
 
@@ -46,8 +52,9 @@ class MatchServiceTest {
     private lateinit var matchService: MatchService
 
     private fun mockCreateRequestDTO(
-        hostId: UUID= UUID.randomUUID(),
-        clubId: UUID= UUID.randomUUID()): MatchCreateRequestDTO {
+        hostId: UUID = UUID.randomUUID(),
+        clubId: UUID = UUID.randomUUID()
+    ): MatchCreateRequestDTO {
         val request = MatchCreateRequestDTO(
             hostId = hostId,
             clubId = clubId,
@@ -60,8 +67,9 @@ class MatchServiceTest {
     }
 
     private fun mockUser(
-        userId: UUID=UUID.randomUUID(),
-        name: String = "Test User"): User {
+        userId: UUID = UUID.randomUUID(),
+        name: String = "Test User"
+    ): User {
         val mockUser = User(
             id = userId,
             displayName = name,
@@ -70,8 +78,16 @@ class MatchServiceTest {
         return mockUser
     }
 
+    private fun mockMatchPlayer(player: User = mockUser(), match: Match = mockMatch() ): MatchPlayer {
+        val mockMatchPlayer = MatchPlayer(
+            player = player,
+            match = match
+        )
+        return mockMatchPlayer
+    }
+
     private fun mockClub(
-        clubId: UUID=UUID.randomUUID(),
+        clubId: UUID = UUID.randomUUID(),
         name: String = "Test Club",
     ): Club {
         val geometryFactory = GeometryFactory(PrecisionModel(), 4326)
@@ -103,7 +119,7 @@ class MatchServiceTest {
 
 
     @Nested
-    inner class CreateMatchTest{
+    inner class CreateMatchTest {
 
         @Test
         fun `createMatch should save match and automatically join the host`() {
@@ -162,10 +178,10 @@ class MatchServiceTest {
     }
 
     @Nested
-    inner class JoinMatchTest{
+    inner class JoinMatchTest {
 
         @Test
-        fun `joinMatch correctly joins a user to a match`(){
+        fun `joinMatch correctly joins a user to a match`() {
             val user = mockUser()
             val host = mockUser()
             val club = mockClub()
@@ -179,18 +195,20 @@ class MatchServiceTest {
 
             matchService.joinMatch(matchId, userId)
 
-            verify(exactly = 1) { matchPlayerRepository.save(
-                withArg { capturedEntity ->
-                    // This lambda executes when the mock intercepts the save() call.
-                    // capturedEntity is the exact object your service instantiated.
-                    assertEquals(match.id, capturedEntity.match.id)
-                    assertEquals(user.id, capturedEntity.player.id)
-                }
-            ) }
+            verify(exactly = 1) {
+                matchPlayerRepository.save(
+                    withArg { capturedEntity ->
+                        // This lambda executes when the mock intercepts the save() call.
+                        // capturedEntity is the exact object your service instantiated.
+                        assertEquals(match.id, capturedEntity.match.id)
+                        assertEquals(user.id, capturedEntity.player.id)
+                    }
+                )
+            }
         }
 
         @Test
-        fun `joinMatch should throw exception when user is missing`(){
+        fun `joinMatch should throw exception when user is missing`() {
 
             val match = mockMatch()
             val matchId = requireNotNull(match.id)
@@ -210,7 +228,7 @@ class MatchServiceTest {
         }
 
         @Test
-        fun `joinMatch should throw exception when match is missing`(){
+        fun `joinMatch should throw exception when match is missing`() {
             every { matchRepository.findById(any()) } returns Optional.empty()
 
             val exception = assertThrows<IllegalArgumentException> {
@@ -224,7 +242,7 @@ class MatchServiceTest {
         }
 
         @Test
-        fun `joinMatch should throw exception when match is not open`(){
+        fun `joinMatch should throw exception when match is not open`() {
             val match = mockMatch(status = MatchService.STATUS_CLOSED)
 
             val matchId = requireNotNull(match.id)
@@ -243,11 +261,11 @@ class MatchServiceTest {
         }
 
         @Test
-        fun `joinMatch should not join the same user twice`(){
+        fun `joinMatch should not join the same user twice`() {
 
             val user = mockUser()
             val host = mockUser()
-            val match = mockMatch(host=host)
+            val match = mockMatch(host = host)
 
             val userId = requireNotNull(user.id)
             val hostId = requireNotNull(host.id)
@@ -268,10 +286,10 @@ class MatchServiceTest {
     }
 
     @Nested
-    inner class GetNearbyMatchesTest{
+    inner class GetNearbyMatchesTest {
 
         @Test
-        fun `getNearbyMatches should translates Longitude and Latitude to X Y correctly`(){
+        fun `getNearbyMatches should translates Longitude and Latitude to X Y correctly`() {
             val testLatitude = -34.0
             val testLongitude = -58.0
             val testRadiusMeters = 5000.0
@@ -283,24 +301,26 @@ class MatchServiceTest {
 
             matchService.getNearbyOpenMatches(testLatitude, testLongitude, testRadiusMeters, testTargetDivision)
 
-            verify(exactly = 1) { matchRepository.findNearbyMatches(
-                eq(MatchService.STATUS_OPEN),
-                withArg { capturedPoint ->
-                    assertEquals(testLatitude, capturedPoint.y)
-                    assertEquals(testLongitude, capturedPoint.x)
-                },
-                eq(testRadiusMeters),
-                eq(testTargetDivision)
-            ) }
+            verify(exactly = 1) {
+                matchRepository.findNearbyMatches(
+                    eq(MatchService.STATUS_OPEN),
+                    withArg { capturedPoint ->
+                        assertEquals(testLatitude, capturedPoint.y)
+                        assertEquals(testLongitude, capturedPoint.x)
+                    },
+                    eq(testRadiusMeters),
+                    eq(testTargetDivision)
+                )
+            }
 
 
         }
     }
 
     @Nested
-    inner class LeaveMatchTest{
+    inner class LeaveMatchTest {
         @Test
-        fun `match host cannot leave the match`(){
+        fun `match host cannot leave the match`() {
             val host = mockUser()
             val club = mockClub()
             val match = mockMatch(host, club)
@@ -308,7 +328,7 @@ class MatchServiceTest {
             val matchId = requireNotNull(match.id)
             val hostId = requireNotNull(host.id)
 
-            every {matchRepository.findById(matchId)} returns Optional.of(match)
+            every { matchRepository.findById(matchId) } returns Optional.of(match)
             every { userRepository.findById(hostId) } returns Optional.of(host)
 
             val exception = assertThrows<IllegalArgumentException> {
@@ -320,27 +340,45 @@ class MatchServiceTest {
 
         }
 
-        fun `player cannot leave a match they are not a part of`(){
+        @Test
+        fun `player cannot leave a match they are not a part of`() {
             val player = mockUser()
-            val host = mockUser()
             val club = mockClub()
-            val match = mockMatch(host, club)
+            val match = mockMatch(mockUser(), club)
 
             val matchId = requireNotNull(match.id)
-            val hostId = requireNotNull(host.id)
+            val playerId = requireNotNull(player.id)
 
-            every {matchPlayerRepository.findByMatchIdAndPlayerId(any(), any())} returns Optional.empty()
-            every { userRepository.findById(hostId) } returns Optional.of(host)
+            every { matchPlayerRepository.findByMatchIdAndPlayerId(any(), any()) } returns null
+            every { userRepository.findById(playerId) } returns Optional.of(player)
+            every { matchRepository.findById(matchId) } returns Optional.of(match)
 
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.leaveMatch(matchId, hostId)
+                matchService.leaveMatch(matchId, playerId)
             }
             assertEquals(MatchService.USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE, exception.message)
             verify(exactly = 0) { matchPlayerRepository.delete(any()) }
 
 
+        }
 
+        @Test
+        fun `leaveMatch should delete the matchPlayer record for the player`() {
+            val match = mockMatch()
+            val player = mockUser()
+            val matchPlayer = mockMatchPlayer(player, match)
+
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            every { matchRepository.findById(matchId) } returns Optional.of(match)
+            every { userRepository.findById(playerId) } returns Optional.of(player)
+            every { matchPlayerRepository.findByMatchIdAndPlayerId(matchId, playerId) } returns matchPlayer
+            every { matchPlayerRepository.delete(any()) } just Runs
+
+            matchService.leaveMatch(matchId, playerId)
+            verify(exactly = 1) { matchPlayerRepository.delete(matchPlayer) }
+        }
 
     }
-
 }
