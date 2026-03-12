@@ -2,6 +2,7 @@ package com.paddle.app.seeder
 
 import com.paddle.app.model.Club
 import com.paddle.app.model.Match
+import com.paddle.app.model.MatchStatus
 import com.paddle.app.model.User
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.MatchRepository
@@ -12,7 +13,6 @@ import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.boot.CommandLineRunner
 import org.springframework.stereotype.Component
 import java.time.OffsetDateTime
-import java.util.UUID
 
 
 @Component
@@ -34,7 +34,7 @@ class DatabaseSeeder(private val userRepository: UserRepository, private val clu
         val dummyMatch = Match(
             host = dummyUser,
             matchDate = OffsetDateTime.now().plusDays(1),
-            status = "OPEN",
+            status = MatchStatus.OPEN,
             club = dummyClub,
             targetDivision = 7,
             pricePerPerson = 15F)

@@ -23,7 +23,7 @@ class Match (
     var club: Club,
 
     @Column(name = "status", nullable = false)
-    var status: String = "OPEN",
+    var status: MatchStatus = MatchStatus.OPEN,
 
     @Column(name = "start_date", nullable = false)
     var matchDate: OffsetDateTime? = null,
@@ -41,4 +41,47 @@ class Match (
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: OffsetDateTime? = null
-)
+) {
+    private fun markAs(status: MatchStatus) {
+        this.status = status
+    }
+
+    fun isOpen(): Boolean {
+        return this.status == MatchStatus.OPEN
+    }
+    fun isFull(): Boolean {
+        return this.status == MatchStatus.FULL
+    }
+    fun isCancelled(): Boolean {
+        return this.status == MatchStatus.CANCELLED
+    }
+    fun isPlayed(): Boolean {
+        return this.status == MatchStatus.PLAYED
+    }
+
+    fun markAsCancelled() {
+        this.markAs(MatchStatus.CANCELLED)
+    }
+    fun markAsFull() {
+        this.markAs(MatchStatus.FULL)
+    }
+    fun markAsPlayed() {
+        this.markAs(MatchStatus.PLAYED)
+    }
+    fun markAsOpen() {
+        this.markAs(MatchStatus.OPEN)
+    }
+
+    fun isHost(userId: UUID): Boolean {
+        return this.host.id == userId
+    }
+
+
+}
+
+enum class MatchStatus {
+    OPEN,
+    FULL,
+    CANCELLED,
+    PLAYED
+}

@@ -2,6 +2,7 @@ package com.paddle.app.engine
 
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.model.MatchmakingTicket
+import com.paddle.app.model.TicketStatus
 import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
@@ -9,7 +10,6 @@ import io.mockk.*
 import io.mockk.impl.annotations.MockK
 import io.mockk.impl.annotations.SpyK
 import io.mockk.junit5.MockKExtension
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
@@ -57,14 +57,14 @@ class MatchmakingEngineTest {
             maxRadiusMeters = 5000.0,
             startTime = now.plusDays(100),
             endTime = now.plusDays(300),
-            status = "SEARCHING"
+            status = TicketStatus.SEARCHING
         )
 
         val mockMatchDTO = mockk<MatchResponseDTO> {
             every { id } returns matchId
         }
 
-        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc("SEARCHING") } returns listOf(ticket)
+        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(ticket)
 
         every {
             matchService.getNearbyOpenMatches(
@@ -83,7 +83,7 @@ class MatchmakingEngineTest {
 
         // Assert
         verify(exactly = 1) { matchService.joinMatch(matchId, userId) }
-        verify(exactly = 1) { matchmakingService.leaveQueue(userId, MatchmakingService.STATUS_MATCHED) }
+        verify(exactly = 1) { matchmakingService.leaveQueue(userId, TicketStatus.MATCHED) }
     }
 
     @Test
@@ -98,17 +98,17 @@ class MatchmakingEngineTest {
             maxRadiusMeters = 5000.0,
             startTime = startTime,
             endTime = startTime.plusHours(2),
-            status = "SEARCHING"
+            status = TicketStatus.SEARCHING
         )
 
-        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc("SEARCHING") } returns listOf(expiredTicket)
-        every { matchmakingService.leaveQueue(expiredTicket.userId, MatchmakingService.STATUS_CANCELLED) } just Runs
+        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(expiredTicket)
+        every { matchmakingService.leaveQueue(expiredTicket.userId, TicketStatus.CANCELLED) } just Runs
 
         matchmakingEngine.processQueue()
 
         // Assert
         verify(exactly = 1) {
-            matchmakingService.leaveQueue(expiredTicket.userId, MatchmakingService.STATUS_EXPIRED)
+            matchmakingService.leaveQueue(expiredTicket.userId, TicketStatus.EXPIRED)
         }
 
         verify(exactly = 0) {
