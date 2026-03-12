@@ -7,6 +7,7 @@ import com.paddle.app.dto.toResponseDTO
 import com.paddle.app.model.Club
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchPlayer
+import com.paddle.app.model.MatchStatus
 import com.paddle.app.model.User
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.MatchPlayerRepository
@@ -32,13 +33,11 @@ class MatchService(
     ) {
 
     companion object {
-        const val STATUS_OPEN = "OPEN"
-        const val STATUS_FULL = "FULL"
         const val STATUS_CLOSED = "CLOSED"
         const val STATUS_CANCELLED = "CANCELLED"
         const val MATCH_NOT_FOUND_MESSAGE = "Match not found"
         const val USER_NOT_FOUND_MESSAGE = "User not found"
-        const val MATCH_NOT_OPEN_MESSAGE = "Match is not open"
+        const val MATCH_FULL_MESSAGE = "Match is full"
         const val CLUB_NOT_FOUND_MESSAGE = "Club not found"
         const val USER_ALREADY_IN_MATCH_MESSAGE = "User is already in this match"
         const val HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE = "Host cannot leave the match"
@@ -56,7 +55,7 @@ class MatchService(
 
         val userLocationPoint = createPointFromCoordinates(longitude, latitude)
 
-        return matchRepository.findNearbyMatches(STATUS_OPEN, userLocationPoint, radiusMeters, targetDivision).map { it.toResponseDTO() }
+        return matchRepository.findNearbyMatches(MatchStatus.OPEN, userLocationPoint, radiusMeters, targetDivision).map { it.toResponseDTO() }
     }
 
     fun getPlayersFromMatch(matchId: UUID): List<UserResponseDTO> {
@@ -89,7 +88,7 @@ class MatchService(
             matchDate = request.matchDate,
             durationMinutes = request.durationMinutes,
             pricePerPerson = request.pricePerPerson,
-            status = STATUS_OPEN,
+            status = MatchStatus.OPEN,
             targetDivision = request.targetDivision
         )
 
@@ -113,7 +112,7 @@ class MatchService(
         matchPlayerRepository.save(reservation)
 
         if (numberOfPlayersInMatch(matchId) == 4) {
-            match.status = STATUS_FULL
+            match.markAsFull()
             matchRepository.save(match)
         }
     }
@@ -122,7 +121,7 @@ class MatchService(
         val match = findMatchById(matchId)
         findUserById(userId)
 
-        if(match.host.id == userId) throw IllegalArgumentException(HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE)
+        if(match.isHost(userId)) throw IllegalArgumentException(HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE)
 
         val matchPlayer = matchPlayerRepository.findByMatchIdAndPlayerId(matchId, userId) ?:
         throw IllegalArgumentException(USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE)
@@ -134,11 +133,11 @@ class MatchService(
         val match = findMatchById(matchId)
         findUserById(userId)
 
-        if (match.host.id != userId) throw SecurityException(ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE)
+        if (!match.isHost(userId)) throw SecurityException(ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE)
 
         assertMatchIsOpen(match)
+        match.markAsCancelled()
 
-        match.status = STATUS_CANCELLED
         matchRepository.save(match)
 
         // TODO: Fetch matchPlayerRepository.findByMatchId(matchId) and send push notifications to other users
@@ -160,7 +159,7 @@ class MatchService(
     }
 
     private fun assertMatchIsOpen(match: Match) {
-        if (match.status != STATUS_OPEN) throw IllegalArgumentException(MATCH_NOT_OPEN_MESSAGE)
+        if (!match.isOpen()) throw IllegalArgumentException(MATCH_FULL_MESSAGE)
     }
 
     private fun findMatchById(matchId: UUID): Match {

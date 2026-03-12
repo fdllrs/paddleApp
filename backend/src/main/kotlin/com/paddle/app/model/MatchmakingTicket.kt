@@ -38,7 +38,7 @@ class MatchmakingTicket (
     val endTime: OffsetDateTime,
 
     @Column(name = "status", nullable = false)
-    var status: MatchmakingTicketStatus,
+    var status: TicketStatus,
 
     @Column(name = "matched_match_id")
     var matchedMatchId: UUID? = null,
@@ -53,24 +53,24 @@ class MatchmakingTicket (
         return currentTime.isAfter(expirationThreshold)
     }
     fun markAsCancelled() {
-        this.changeStatusTo(MatchmakingTicketStatus.CANCELLED)
+        this.changeStatusTo(TicketStatus.CANCELLED)
     }
     fun markAsExpired() {
-        this.changeStatusTo(MatchmakingTicketStatus.EXPIRED)
+        this.changeStatusTo(TicketStatus.EXPIRED)
     }
     fun markAsMatched(matchId: UUID) {
-        this.changeStatusTo(MatchmakingTicketStatus.MATCHED)
+        this.changeStatusTo(TicketStatus.MATCHED)
         this.matchedMatchId = matchId
     }
 
 
-    private fun changeStatusTo(status: MatchmakingTicketStatus) {
+    private fun changeStatusTo(status: TicketStatus) {
         this.status = status
     }
 
 
 }
-enum class MatchmakingTicketStatus {
+enum class TicketStatus {
     SEARCHING,
     MATCHED,
     EXPIRED,

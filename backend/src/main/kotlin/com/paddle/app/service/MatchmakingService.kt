@@ -3,6 +3,7 @@ package com.paddle.app.service
 import com.paddle.app.dto.QueueRequestDTO
 import com.paddle.app.model.Club
 import com.paddle.app.model.MatchmakingTicket
+import com.paddle.app.model.TicketStatus
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.UserRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
@@ -47,7 +48,7 @@ class MatchmakingService(
             endTime = request.endTime,
             targetDivision = user.division,
             searchLocation = searchLocation,
-            status = STATUS_SEARCHING,
+            status = TicketStatus.SEARCHING,
             maxRadiusMeters = request.radiusMeters,
         )
 
@@ -56,7 +57,7 @@ class MatchmakingService(
         return savedTicket.id!!
     }
 
-    fun leaveQueue(userId: UUID, status: String) {
+    fun leaveQueue(userId: UUID, status: TicketStatus) {
         val ticket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING) ?:
         throw IllegalArgumentException("User is not in the matchmaking queue")
 

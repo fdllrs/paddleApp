@@ -4,6 +4,7 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.model.Club
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchPlayer
+import com.paddle.app.model.MatchStatus
 import com.paddle.app.model.User
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.MatchPlayerRepository
@@ -29,6 +30,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import java.time.OffsetDateTime
 import java.util.Optional
 import java.util.UUID
+import kotlin.test.assertTrue
 
 @ExtendWith(MockKExtension::class)
 class MatchServiceTest {
@@ -92,7 +94,7 @@ class MatchServiceTest {
         host: User = testUser(),
         club: Club = testClub(),
         date: OffsetDateTime = fixedDateTime,
-        status: String = MatchService.STATUS_OPEN
+        status: MatchStatus = MatchStatus.OPEN
     ): Match =
         Match(
             id = id,
@@ -124,10 +126,6 @@ class MatchServiceTest {
 
     private fun givenMatchExists(match: Match) {
         every { matchRepository.findById(requireNotNull(match.id)) } returns Optional.of(match)
-    }
-
-    private fun givenMatchPlayerExists(matchPlayer: MatchPlayer) {
-        every { matchPlayerRepository.findById(requireNotNull(matchPlayer.id)) } returns Optional.of(matchPlayer)
     }
 
     private fun givenUserMissing(userId: UUID) {
@@ -268,10 +266,10 @@ class MatchServiceTest {
         }
 
         @Test
-        fun `joinMatch should throw exception when match is not open`() {
+        fun `joinMatch should throw exception when match is full`() {
             // Arrange
             val player = testUser()
-            val closedMatch = testMatch(status = MatchService.STATUS_CLOSED)
+            val closedMatch = testMatch(status = MatchStatus.FULL)
 
             givenMatchExists(closedMatch)
             givenUserExists(player)
@@ -282,7 +280,7 @@ class MatchServiceTest {
             }
 
             // Assert
-            assertEquals(MatchService.MATCH_NOT_OPEN_MESSAGE, exception.message)
+            assertEquals(MatchService.MATCH_FULL_MESSAGE, exception.message)
             verify(exactly = 0) { matchPlayerRepository.save(any()) }
         }
 
@@ -330,7 +328,7 @@ class MatchServiceTest {
             // Assert
             verify(exactly = 1) {
                 matchRepository.findNearbyMatches(
-                    eq(MatchService.STATUS_OPEN),
+                    eq(MatchStatus.OPEN),
                     withArg { point ->
                         assertEquals(latitude, point.y)
                         assertEquals(longitude, point.x)
@@ -426,7 +424,7 @@ class MatchServiceTest {
             matchService.cancelMatch(requireNotNull(match.id), requireNotNull(host.id))
 
             // Assert
-            assertEquals(MatchService.STATUS_CANCELLED, match.status)
+            assertTrue { match.isCancelled() }
             verify(exactly = 1) { matchRepository.save(match) }
         }
 

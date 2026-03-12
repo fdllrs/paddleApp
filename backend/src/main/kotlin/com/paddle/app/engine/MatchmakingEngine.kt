@@ -1,16 +1,15 @@
 package com.paddle.app.engine
 
 import com.paddle.app.model.MatchmakingTicket
+import com.paddle.app.model.TicketStatus
 import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
-import org.locationtech.jts.geom.Point
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.OffsetDateTime
-import java.util.UUID
 
 @Component
 class MatchmakingEngine(
@@ -26,7 +25,7 @@ class MatchmakingEngine(
         logger.info("Matchmaking Engine: Sweeping the queue...")
 
         try {
-            val openTickets = ticketRepository.findByStatusOrderByCreatedAtAsc("SEARCHING")
+            val openTickets = ticketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING)
 
             for (ticket in openTickets) {
 
@@ -45,7 +44,7 @@ class MatchmakingEngine(
                         val matchId = requireNotNull(match.id)
                         if (matchService.numberOfPlayersInMatch(matchId) == 3) {
                             matchService.joinMatch(matchId, userId)
-                            matchmakingService.leaveQueue(userId, MatchmakingService.STATUS_MATCHED)
+                            matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
                             logger.info("Matchmaking Engine: Match found and joined: $matchId")
                             return@forEach
                         }
@@ -59,7 +58,7 @@ class MatchmakingEngine(
         }
     }
     private fun handleExpiredTicket(ticket: MatchmakingTicket) {
-        matchmakingService.leaveQueue(ticket.userId, MatchmakingService.STATUS_EXPIRED)
+        matchmakingService.leaveQueue(ticket.userId, TicketStatus.EXPIRED)
         logger.info("Matchmaking Engine: Ticket ${ticket.id} expired (less than 30m remaining or past endTime)")
     }
 

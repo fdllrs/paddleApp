@@ -6,6 +6,7 @@ import com.paddle.app.dto.QueueRequestDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.User
 import com.paddle.app.model.Club
+import com.paddle.app.model.TicketStatus
 import io.mockk.every
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -23,8 +24,6 @@ import org.locationtech.jts.geom.GeometryFactory
 import com.paddle.app.repository.ClubRepository
 import org.junit.jupiter.api.Assertions.assertNotNull
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import org.springframework.aot.hint.TypeReference.listOf
 
 
 @ExtendWith(MockKExtension::class)
@@ -83,7 +82,7 @@ class MatchmakingServiceTest {
             endTime = request.endTime,
             targetDivision = mockUser.division,
             searchLocation = searchLocation,
-            status = "SEARCHING",
+            status = TicketStatus.SEARCHING,
             maxRadiusMeters = request.radiusMeters,
         )
 

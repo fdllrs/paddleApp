@@ -1,12 +1,13 @@
 package com.paddle.app.dto
 
 import com.paddle.app.model.Match
+import com.paddle.app.model.MatchStatus
 import java.time.OffsetDateTime
 import java.util.UUID
 
 data class MatchResponseDTO(
     val id: UUID?,
-    val status: String,
+    val status: MatchStatus,
     val matchDate: OffsetDateTime?,
     val durationMinutes: Int,
     val pricePerPerson: Float,
