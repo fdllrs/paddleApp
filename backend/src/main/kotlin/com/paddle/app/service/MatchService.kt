@@ -56,7 +56,6 @@ class MatchService(
         return matchRepository.findNearbyMatches(STATUS_OPEN, userLocationPoint, radiusMeters, targetDivision).map { it.toResponseDTO() }
     }
 
-
     fun getPlayersFromMatch(matchId: UUID): List<UserResponseDTO> {
         val matchPlayers = matchPlayerRepository.findByMatchId(matchId)
 
@@ -110,6 +109,10 @@ class MatchService(
         // 4. Save to the database
         matchPlayerRepository.save(reservation)
 
+        if (numberOfPlayersInMatch(matchId) == 4) {
+            match.status = STATUS_FULL
+            matchRepository.save(match)
+        }
     }
 
     fun leaveMatch(matchId: UUID, userId: UUID) {
