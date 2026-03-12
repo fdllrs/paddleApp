@@ -47,4 +47,9 @@ class MatchmakingTicket (
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: OffsetDateTime? = null
 
-    )
+    ) {
+    fun isExpired(now: OffsetDateTime): Boolean {
+        val expirationThreshold = this.startTime.minusMinutes(30)
+        return now.isAfter(expirationThreshold)
+    }
+}

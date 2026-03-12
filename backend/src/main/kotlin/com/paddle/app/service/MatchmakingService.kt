@@ -22,6 +22,7 @@ class MatchmakingService(
     companion object {
         const val STATUS_SEARCHING = "SEARCHING"
         const val STATUS_CANCELLED = "CANCELLED"
+        const val STATUS_EXPIRED = "EXIPRED"
         const val STATUS_MATCHED = "MATCHED"
     }
 
