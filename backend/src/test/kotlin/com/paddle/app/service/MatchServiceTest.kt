@@ -17,8 +17,7 @@ import io.mockk.junit5.MockKExtension
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -27,15 +26,13 @@ import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.data.repository.findByIdOrNull
 import java.time.OffsetDateTime
-import java.util.UUID
 import java.util.Optional
+import java.util.UUID
 
 @ExtendWith(MockKExtension::class)
 class MatchServiceTest {
 
-    // 1. Mock the dependencies (The Database layer)
     @MockK
     private lateinit var matchRepository: MatchRepository
 
@@ -51,130 +48,149 @@ class MatchServiceTest {
     @InjectMockKs
     private lateinit var matchService: MatchService
 
-    private fun mockCreateRequestDTO(
+    private val fixedDateTime: OffsetDateTime = OffsetDateTime.parse("2026-01-10T18:00:00Z")
+    private val geometryFactory = GeometryFactory(PrecisionModel(), 4326)
+
+    private fun testMatchCreateRequestDTO(
         hostId: UUID = UUID.randomUUID(),
-        clubId: UUID = UUID.randomUUID()
-    ): MatchCreateRequestDTO {
-        val request = MatchCreateRequestDTO(
+        clubId: UUID = UUID.randomUUID(),
+        matchDate: OffsetDateTime = fixedDateTime
+    ): MatchCreateRequestDTO =
+        MatchCreateRequestDTO(
             hostId = hostId,
             clubId = clubId,
-            matchDate = OffsetDateTime.now(),
+            matchDate = matchDate,
             durationMinutes = 90,
             pricePerPerson = 15f,
             targetDivision = 5
         )
-        return request
-    }
 
-    private fun mockUser(
-        userId: UUID = UUID.randomUUID(),
-        name: String = "Test User"
-    ): User {
-        val mockUser = User(
-            id = userId,
+    private fun testUser(
+        id: UUID = UUID.randomUUID(),
+        name: String = "Test User",
+        division: Int = 5
+    ): User =
+        User(
+            id = id,
             displayName = name,
-            division = 5
+            division = division
         )
-        return mockUser
-    }
 
-    private fun mockMatchPlayer(player: User = mockUser(), match: Match = mockMatch() ): MatchPlayer {
-        val mockMatchPlayer = MatchPlayer(
-            player = player,
-            match = match
-        )
-        return mockMatchPlayer
-    }
-
-    private fun mockClub(
-        clubId: UUID = UUID.randomUUID(),
-        name: String = "Test Club",
-    ): Club {
-        val geometryFactory = GeometryFactory(PrecisionModel(), 4326)
-
-        val club = Club(
-            id = clubId,
+    private fun testClub(
+        id: UUID = UUID.randomUUID(),
+        name: String = "Test Club"
+    ): Club =
+        Club(
+            id = id,
             name = name,
             address = "123 St",
             location = geometryFactory.createPoint(Coordinate(-58.0, -34.0))
         )
-        return club
+
+    private fun testMatch(
+        id: UUID = UUID.randomUUID(),
+        host: User = testUser(),
+        club: Club = testClub(),
+        date: OffsetDateTime = fixedDateTime,
+        status: String = MatchService.STATUS_OPEN
+    ): Match =
+        Match(
+            id = id,
+            host = host,
+            club = club,
+            matchDate = date,
+            durationMinutes = 90,
+            pricePerPerson = 15f,
+            targetDivision = 5,
+            status = status
+        )
+
+    private fun testMatchPlayer(
+        player: User = testUser(),
+        match: Match = testMatch()
+    ): MatchPlayer =
+        MatchPlayer(
+            player = player,
+            match = match
+        )
+
+    private fun givenUserExists(user: User) {
+        every { userRepository.findById(requireNotNull(user.id)) } returns Optional.of(user)
     }
 
-    private fun mockMatch(
-        host: User = mockUser(),
-        club: Club = mockClub(),
-        date: OffsetDateTime = OffsetDateTime.now(),
-        status: String = MatchService.STATUS_OPEN
-    ): Match = Match(
-        id = UUID.randomUUID(),
-        host = host,
-        club = club,
-        matchDate = date,
-        durationMinutes = 90,
-        pricePerPerson = 15f,
-        targetDivision = 5,
-        status = status
-    )
+    private fun givenClubExists(club: Club) {
+        every { clubRepository.findById(requireNotNull(club.id)) } returns Optional.of(club)
+    }
 
+    private fun givenMatchExists(match: Match) {
+        every { matchRepository.findById(requireNotNull(match.id)) } returns Optional.of(match)
+    }
+
+    private fun givenUserMissing(userId: UUID) {
+        every { userRepository.findById(userId) } returns Optional.empty()
+    }
+
+    private fun givenClubMissing(clubId: UUID) {
+        every { clubRepository.findById(clubId) } returns Optional.empty()
+    }
+
+    private fun givenMatchMissing(matchId: UUID) {
+        every { matchRepository.findById(matchId) } returns Optional.empty()
+    }
 
     @Nested
     inner class CreateMatchTest {
 
         @Test
         fun `createMatch should save match and automatically join the host`() {
+            // Arrange
+            val host = testUser(name = "John Doe")
+            val club = testClub(name = "Test Club")
+            val request = testMatchCreateRequestDTO(
+                hostId = requireNotNull(host.id),
+                clubId = requireNotNull(club.id),
+                matchDate = fixedDateTime
+            )
+            val match = testMatch(host = host, club = club, date = request.matchDate)
 
-            val userName = "John Doe"
-            val clubName = "Test Club"
-            val mockUser = mockUser(name = userName)
-            val mockClub = mockClub(name = clubName)
-            val userId = requireNotNull(mockUser.id)
-            val clubId = requireNotNull(mockClub.id)
-            val request = mockCreateRequestDTO(userId, clubId)
-
-            val mockMatch = mockMatch(mockUser, mockClub, request.matchDate)
-            val matchId = requireNotNull(mockMatch.id)
-
-            // Tell the mocks how to behave when the Service calls them
-            every { userRepository.findById(userId) } returns Optional.of(mockUser)
-            every { clubRepository.findById(clubId) } returns Optional.of(mockClub)
-            every { matchRepository.findById(matchId) } returns Optional.of(mockMatch)
-            every { matchRepository.save(any()) } returns mockMatch
+            givenUserExists(host)
+            givenClubExists(club)
+            givenMatchExists(match)
+            every { matchRepository.save(any()) } returns match
             every { matchPlayerRepository.save(any()) } returns mockk()
 
-            // WHEN (Act)
+            // Act
             val response = matchService.createMatch(request)
 
-            // THEN (Assert)
-            assertEquals(mockMatch.id, response.id)
-            assertEquals(clubName, response.clubName)
-            assertEquals(userName, response.hostName)
-
-            // Verify that the repository methods were actually called exactly once
+            // Assert
+            assertEquals(match.id, response.id)
+            assertEquals(club.name, response.clubName)
+            assertEquals(host.displayName, response.hostName)
             verify(exactly = 1) { matchRepository.save(any()) }
             verify(exactly = 1) { matchPlayerRepository.save(any()) }
         }
 
         @Test
         fun `createMatch should throw exception when club is not found`() {
-            // GIVEN
-            val request = mockCreateRequestDTO()
-            val mockUser = mockUser()
+            // Arrange
+            val host = testUser()
+            val request = testMatchCreateRequestDTO(
+                hostId = requireNotNull(host.id),
+                clubId = UUID.randomUUID()
+            )
 
-            every { userRepository.findById(request.hostId) } returns Optional.of(mockUser)
-            every { clubRepository.findById(request.clubId) } returns Optional.empty() // Simulate database missing the club
+            givenUserExists(host)
+            givenClubMissing(request.clubId)
 
-            // WHEN & THEN
+            // Act
             val exception = assertThrows<IllegalArgumentException> {
                 matchService.createMatch(request)
             }
 
+            // Assert
             assertEquals(MatchService.CLUB_NOT_FOUND_MESSAGE, exception.message)
-
-            // Ensure the database NEVER tried to save a broken match
             verify(exactly = 0) { matchRepository.save(any()) }
         }
-
     }
 
     @Nested
@@ -182,26 +198,25 @@ class MatchServiceTest {
 
         @Test
         fun `joinMatch correctly joins a user to a match`() {
-            val user = mockUser()
-            val host = mockUser()
-            val club = mockClub()
-            val match = mockMatch(host, club, OffsetDateTime.now())
-            val userId = requireNotNull(user.id)
-            val matchId = requireNotNull(match.id)
+            // Arrange
+            val player = testUser(name = "Player")
+            val host = testUser(name = "Host")
+            val club = testClub()
+            val match = testMatch(host = host, club = club)
 
-            every { userRepository.findById(userId) } returns Optional.of(user)
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
+            givenUserExists(player)
+            givenMatchExists(match)
             every { matchPlayerRepository.save(any()) } returns mockk()
 
-            matchService.joinMatch(matchId, userId)
+            // Act
+            matchService.joinMatch(requireNotNull(match.id), requireNotNull(player.id))
 
+            // Assert
             verify(exactly = 1) {
                 matchPlayerRepository.save(
-                    withArg { capturedEntity ->
-                        // This lambda executes when the mock intercepts the save() call.
-                        // capturedEntity is the exact object your service instantiated.
-                        assertEquals(match.id, capturedEntity.match.id)
-                        assertEquals(user.id, capturedEntity.player.id)
+                    withArg { savedMatchPlayer ->
+                        assertEquals(match.id, savedMatchPlayer.match.id)
+                        assertEquals(player.id, savedMatchPlayer.player.id)
                     }
                 )
             }
@@ -209,176 +224,225 @@ class MatchServiceTest {
 
         @Test
         fun `joinMatch should throw exception when user is missing`() {
+            // Arrange
+            val match = testMatch()
+            val missingUserId = UUID.randomUUID()
 
-            val match = mockMatch()
-            val matchId = requireNotNull(match.id)
+            givenMatchExists(match)
+            givenUserMissing(missingUserId)
 
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
-            every { userRepository.findById(any()) } returns Optional.empty()
-
-
+            // Act
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.joinMatch(matchId, UUID.randomUUID())
+                matchService.joinMatch(requireNotNull(match.id), missingUserId)
             }
 
+            // Assert
             assertEquals(MatchService.USER_NOT_FOUND_MESSAGE, exception.message)
-
             verify(exactly = 0) { matchPlayerRepository.save(any()) }
-
         }
 
         @Test
         fun `joinMatch should throw exception when match is missing`() {
-            every { matchRepository.findById(any()) } returns Optional.empty()
+            // Arrange
+            val missingMatchId = UUID.randomUUID()
+            val userId = UUID.randomUUID()
 
+            givenMatchMissing(missingMatchId)
+
+            // Act
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.joinMatch(UUID.randomUUID(), UUID.randomUUID())
+                matchService.joinMatch(missingMatchId, userId)
             }
 
+            // Assert
             assertEquals(MatchService.MATCH_NOT_FOUND_MESSAGE, exception.message)
-
             verify(exactly = 0) { matchPlayerRepository.save(any()) }
-
         }
 
         @Test
         fun `joinMatch should throw exception when match is not open`() {
-            val match = mockMatch(status = MatchService.STATUS_CLOSED)
+            // Arrange
+            val player = testUser()
+            val closedMatch = testMatch(status = MatchService.STATUS_CLOSED)
 
-            val matchId = requireNotNull(match.id)
+            givenMatchExists(closedMatch)
+            givenUserExists(player)
 
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
-            every { userRepository.findById(any()) } returns Optional.of(mockUser())
-
+            // Act
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.joinMatch(matchId, UUID.randomUUID())
+                matchService.joinMatch(requireNotNull(closedMatch.id), requireNotNull(player.id))
             }
 
+            // Assert
             assertEquals(MatchService.MATCH_NOT_OPEN_MESSAGE, exception.message)
-
             verify(exactly = 0) { matchPlayerRepository.save(any()) }
-
         }
 
         @Test
         fun `joinMatch should not join the same user twice`() {
+            // Arrange
+            val player = testUser()
+            val host = testUser()
+            val match = testMatch(host = host)
 
-            val user = mockUser()
-            val host = mockUser()
-            val match = mockMatch(host = host)
+            givenMatchExists(match)
+            givenUserExists(player)
+            every {
+                matchPlayerRepository.save(any())
+            } throws DataIntegrityViolationException(MatchService.USER_ALREADY_IN_MATCH_MESSAGE)
 
-            val userId = requireNotNull(user.id)
-            val hostId = requireNotNull(host.id)
-            val matchId = requireNotNull(match.id)
-
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
-            every { userRepository.findById(hostId) } returns Optional.of(host)
-            every { userRepository.findById(userId) } returns Optional.of(user)
-            every { matchPlayerRepository.save(any()) } throws DataIntegrityViolationException(MatchService.USER_ALREADY_IN_MATCH_MESSAGE)
-
+            // Act
             val exception = assertThrows<DataIntegrityViolationException> {
-                matchService.joinMatch(matchId, userId)
+                matchService.joinMatch(requireNotNull(match.id), requireNotNull(player.id))
             }
 
+            // Assert
             assertEquals(MatchService.USER_ALREADY_IN_MATCH_MESSAGE, exception.message)
         }
-
     }
 
     @Nested
     inner class GetNearbyMatchesTest {
 
         @Test
-        fun `getNearbyMatches should translates Longitude and Latitude to X Y correctly`() {
-            val testLatitude = -34.0
-            val testLongitude = -58.0
-            val testRadiusMeters = 5000.0
-            val testTargetDivision = 7
+        fun `getNearbyMatches should translate latitude and longitude to point coordinates correctly`() {
+            // Arrange
+            val latitude = -34.0
+            val longitude = -58.0
+            val radiusMeters = 5000.0
+            val targetDivision = 7
 
-            val mockMatch = mockMatch()
+            every {
+                matchRepository.findNearbyMatches(any(), any(), any(), any())
+            } returns listOf(testMatch())
 
-            every { matchRepository.findNearbyMatches(any(), any(), any(), any()) } returns listOf(mockMatch)
+            // Act
+            matchService.getNearbyOpenMatches(latitude, longitude, radiusMeters, targetDivision)
 
-            matchService.getNearbyOpenMatches(testLatitude, testLongitude, testRadiusMeters, testTargetDivision)
-
+            // Assert
             verify(exactly = 1) {
                 matchRepository.findNearbyMatches(
                     eq(MatchService.STATUS_OPEN),
-                    withArg { capturedPoint ->
-                        assertEquals(testLatitude, capturedPoint.y)
-                        assertEquals(testLongitude, capturedPoint.x)
+                    withArg { point ->
+                        assertEquals(latitude, point.y)
+                        assertEquals(longitude, point.x)
                     },
-                    eq(testRadiusMeters),
-                    eq(testTargetDivision)
+                    eq(radiusMeters),
+                    eq(targetDivision)
                 )
             }
-
-
         }
     }
 
     @Nested
     inner class LeaveMatchTest {
+
         @Test
         fun `match host cannot leave the match`() {
-            val host = mockUser()
-            val club = mockClub()
-            val match = mockMatch(host, club)
+            // Arrange
+            val host = testUser()
+            val match = testMatch(host = host)
 
-            val matchId = requireNotNull(match.id)
-            val hostId = requireNotNull(host.id)
+            givenMatchExists(match)
+            givenUserExists(host)
 
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
-            every { userRepository.findById(hostId) } returns Optional.of(host)
-
+            // Act
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.leaveMatch(matchId, hostId)
+                matchService.leaveMatch(requireNotNull(match.id), requireNotNull(host.id))
             }
+
+            // Assert
             assertEquals(MatchService.HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE, exception.message)
-
             verify(exactly = 0) { matchPlayerRepository.delete(any()) }
-
         }
 
         @Test
         fun `player cannot leave a match they are not a part of`() {
-            val player = mockUser()
-            val club = mockClub()
-            val match = mockMatch(mockUser(), club)
+            // Arrange
+            val player = testUser()
+            val host = testUser()
+            val match = testMatch(host = host)
 
-            val matchId = requireNotNull(match.id)
-            val playerId = requireNotNull(player.id)
+            givenMatchExists(match)
+            givenUserExists(player)
+            every {
+                matchPlayerRepository.findByMatchIdAndPlayerId(requireNotNull(match.id), requireNotNull(player.id))
+            } returns null
 
-            every { matchPlayerRepository.findByMatchIdAndPlayerId(any(), any()) } returns null
-            every { userRepository.findById(playerId) } returns Optional.of(player)
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
-
+            // Act
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.leaveMatch(matchId, playerId)
+                matchService.leaveMatch(requireNotNull(match.id), requireNotNull(player.id))
             }
+
+            // Assert
             assertEquals(MatchService.USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE, exception.message)
             verify(exactly = 0) { matchPlayerRepository.delete(any()) }
-
-
         }
 
         @Test
         fun `leaveMatch should delete the matchPlayer record for the player`() {
-            val match = mockMatch()
-            val player = mockUser()
-            val matchPlayer = mockMatchPlayer(player, match)
+            // Arrange
+            val match = testMatch()
+            val player = testUser()
+            val existingMembership = testMatchPlayer(player = player, match = match)
 
-            val matchId = requireNotNull(match.id)
-            val playerId = requireNotNull(player.id)
-
-            every { matchRepository.findById(matchId) } returns Optional.of(match)
-            every { userRepository.findById(playerId) } returns Optional.of(player)
-            every { matchPlayerRepository.findByMatchIdAndPlayerId(matchId, playerId) } returns matchPlayer
+            givenMatchExists(match)
+            givenUserExists(player)
+            every {
+                matchPlayerRepository.findByMatchIdAndPlayerId(requireNotNull(match.id), requireNotNull(player.id))
+            } returns existingMembership
             every { matchPlayerRepository.delete(any()) } just Runs
 
-            matchService.leaveMatch(matchId, playerId)
-            verify(exactly = 1) { matchPlayerRepository.delete(matchPlayer) }
+            // Act
+            matchService.leaveMatch(requireNotNull(match.id), requireNotNull(player.id))
+
+            // Assert
+            verify(exactly = 1) { matchPlayerRepository.delete(existingMembership) }
+        }
+    }
+
+    @Nested
+    inner class CancelMatchTest {
+
+        @Test
+        fun `cancelMatch should set the status to cancelled`() {
+            // Arrange
+            val host = testUser()
+            val match = testMatch(host = host)
+
+            givenMatchExists(match)
+            givenUserExists(host)
+            every { matchRepository.save(any()) } returns match
+
+            // Act
+            matchService.cancelMatch(requireNotNull(match.id), requireNotNull(host.id))
+
+            // Assert
+            assertEquals(MatchService.STATUS_CANCELLED, match.status)
+            verify(exactly = 1) { matchRepository.save(match) }
         }
 
+        @Test
+        fun `cancelMatch should not allow user other than host to cancel`(){
+            val user = testUser()
+            val host = testUser()
+            val match = testMatch(host = host)
+
+            val matchId = requireNotNull(match.id)
+            val userId = requireNotNull(user.id)
+
+            givenMatchExists(match)
+            givenUserExists(host)
+            givenUserExists(user)
+
+            val exception = assertThrows<SecurityException> { matchService.cancelMatch(matchId, userId) }
+
+
+            assertEquals(MatchService.ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE, exception.message)
+            verify(exactly = 0) { matchRepository.save(any()) }
+        }
+
+
     }
+
 }
