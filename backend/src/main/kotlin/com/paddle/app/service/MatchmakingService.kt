@@ -1,6 +1,8 @@
 package com.paddle.app.service
 
 import com.paddle.app.dto.QueueRequestDTO
+import com.paddle.app.dto.QueueStatusResponseDTO
+import com.paddle.app.dto.toQueueStatusResponseDTO
 import com.paddle.app.model.Club
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
@@ -78,6 +80,15 @@ class MatchmakingService(
     fun isPlayerInQueue(playerID: UUID): Boolean {
         return matchmakingTicketRepository.existsByUserId(playerID)
     }
+
+    fun getTicketStatusForUser(playerID: UUID): QueueStatusResponseDTO {
+        val ticket = matchmakingTicketRepository.findByUserId(playerID) ?:
+        throw IllegalArgumentException("User is not in the matchmaking queue")
+
+        return ticket.toQueueStatusResponseDTO()
+    }
+
+
 
     fun queueIsEmpty(): Boolean {
         return matchmakingTicketRepository.count() == 0L
