@@ -121,7 +121,7 @@ class MatchmakingServiceTest {
 
         assertNotNull(result)
         assertEquals(1, result.size)
-        assertEquals("Central Padel", result[0].name)
+        assertEquals(result[0], expectedClub)
 
         verify(exactly = 1) {
             clubRepository.findClubsInIntersection(p1Loc, radius, p2Loc, radius)
