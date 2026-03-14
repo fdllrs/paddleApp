@@ -33,6 +33,7 @@ class MatchmakingEngineTest {
     private lateinit var matchmakingService: MatchmakingService
     @SpyK
     private var geometryFactory = GeometryFactory()
+
     private val clock: Clock = Clock.fixed(
         Instant.parse("2026-03-12T10:00:00Z"),
         ZoneId.of("UTC")
@@ -57,7 +58,11 @@ class MatchmakingEngineTest {
             maxRadiusMeters = 5000.0,
             startTime = now.plusDays(100),
             endTime = now.plusDays(300),
-            status = TicketStatus.SEARCHING
+            status = TicketStatus.SEARCHING,
+            preferredCourtId = UUID.randomUUID(),
+            preferredClubId = UUID.randomUUID(),
+            preferredMatchDate = now.plusDays(200),
+            preferredDurationMinutes = 90
         )
 
         val mockMatchDTO = mockk<MatchResponseDTO> {
@@ -97,7 +102,11 @@ class MatchmakingEngineTest {
             maxRadiusMeters = 5000.0,
             startTime = startTime,
             endTime = startTime.plusHours(2),
-            status = TicketStatus.SEARCHING
+            status = TicketStatus.SEARCHING,
+            preferredCourtId = UUID.randomUUID(),
+            preferredClubId = UUID.randomUUID(),
+            preferredMatchDate = startTime.plusDays(1),
+            preferredDurationMinutes = 90
         )
 
         every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(expiredTicket)
@@ -129,7 +138,11 @@ class MatchmakingEngineTest {
             maxRadiusMeters = 5000.0,
             startTime = now.plusDays(1),
             endTime = now.plusDays(2),
-            status = TicketStatus.SEARCHING
+            status = TicketStatus.SEARCHING,
+            preferredCourtId = UUID.randomUUID(),
+            preferredClubId = UUID.randomUUID(),
+            preferredMatchDate = now.plusDays(1),
+            preferredDurationMinutes = 90
         )
 
         val match1 = mockk<MatchResponseDTO> { every { id } returns matchId1 }

@@ -9,4 +9,9 @@ data class QueueRequestDTO(
     val radiusMeters: Double,
     val startTime: OffsetDateTime,
     val endTime: OffsetDateTime,
+
+    val preferredClubId: UUID,
+    val preferredCourtId: UUID,
+    val preferredDate: OffsetDateTime,
+    val preferredDurationMinutes: Int
 )
