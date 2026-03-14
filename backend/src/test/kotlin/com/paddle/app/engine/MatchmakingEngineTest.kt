@@ -33,17 +33,17 @@ class MatchmakingEngineTest {
     private lateinit var matchmakingService: MatchmakingService
     @SpyK
     private var geometryFactory = GeometryFactory()
-
-    @InjectMockKs
-    private lateinit var matchmakingEngine: MatchmakingEngine
-
-    private val fixedClock: Clock = Clock.fixed(
+    private val clock: Clock = Clock.fixed(
         Instant.parse("2026-03-12T10:00:00Z"),
         ZoneId.of("UTC")
     )
 
+    @InjectMockKs
+    private lateinit var matchmakingEngine: MatchmakingEngine
+
+
     @Test
-    fun `queueing player joins a compatible 3-player match and ticket is updated`() {
+    fun `queueing player joins a compatible match and ticket is updated`() {
         // Arrange
         val userId = UUID.randomUUID()
         val matchId = UUID.randomUUID()
@@ -75,7 +75,6 @@ class MatchmakingEngineTest {
             )
         } returns listOf(mockMatchDTO)
 
-        every { matchService.numberOfPlayersInMatch(matchId) } returns 3
         every { matchService.joinMatch(matchId, userId) } just Runs
         every { matchmakingService.leaveQueue(userId, any()) } just Runs
 
@@ -88,7 +87,7 @@ class MatchmakingEngineTest {
 
     @Test
     fun `matchmaking ticket expires if start time is in less than 30 min`() {
-        val now = OffsetDateTime.now(fixedClock)
+        val now = OffsetDateTime.now(clock)
 
         val startTime = now.plusMinutes(25)
         val expiredTicket = MatchmakingTicket(
@@ -102,7 +101,7 @@ class MatchmakingEngineTest {
         )
 
         every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(expiredTicket)
-        every { matchmakingService.leaveQueue(expiredTicket.userId, TicketStatus.CANCELLED) } just Runs
+        every { matchmakingService.leaveQueue(expiredTicket.userId, TicketStatus.EXPIRED) } just Runs
 
         matchmakingEngine.processQueue()
 
@@ -114,5 +113,44 @@ class MatchmakingEngineTest {
         verify(exactly = 0) {
             matchService.getNearbyOpenMatches(any(), any(), any(), any())
         }
+    }
+
+    @Test
+    fun `engine tries next match if joining the first match fails`() {
+        val userId = UUID.randomUUID()
+        val matchId1 = UUID.randomUUID()
+        val matchId2 = UUID.randomUUID()
+        val now = OffsetDateTime.now(clock)
+
+        val ticket = MatchmakingTicket(
+            userId = userId,
+            targetDivision = 4,
+            searchLocation = geometryFactory.createPoint(Coordinate(0.0, 0.0)),
+            maxRadiusMeters = 5000.0,
+            startTime = now.plusDays(1),
+            endTime = now.plusDays(2),
+            status = TicketStatus.SEARCHING
+        )
+
+        val match1 = mockk<MatchResponseDTO> { every { id } returns matchId1 }
+        val match2 = mockk<MatchResponseDTO> { every { id } returns matchId2 }
+
+        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(ticket)
+        // Engine finds 2 nearby matches
+        every { matchService.getNearbyOpenMatches(any(), any(), any(), any()) } returns listOf(match1, match2)
+
+        // match1 throws an exception (e.g. game is full)
+        every { matchService.joinMatch(matchId1, userId) } throws IllegalStateException("Match full")
+        // match2 succeeds
+        every { matchService.joinMatch(matchId2, userId) } just Runs
+        every { matchmakingService.leaveQueue(userId, TicketStatus.MATCHED) } just Runs
+
+        // Act
+        matchmakingEngine.processQueue()
+
+        // Assert
+        verify(exactly = 1) { matchService.joinMatch(matchId1, userId) }
+        verify(exactly = 1) { matchService.joinMatch(matchId2, userId) }
+        verify(exactly = 1) { matchmakingService.leaveQueue(userId, TicketStatus.MATCHED) }
     }
 }
