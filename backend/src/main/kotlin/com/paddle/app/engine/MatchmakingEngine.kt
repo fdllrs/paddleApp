@@ -1,5 +1,6 @@
 package com.paddle.app.engine
 
+import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
 import com.paddle.app.repository.MatchmakingTicketRepository
@@ -10,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.OffsetDateTime
+import java.util.UUID
 
 @Component
 class MatchmakingEngine(
@@ -33,30 +35,45 @@ class MatchmakingEngine(
                     handleExpiredTicket(ticket)
                     continue
                 }
-
-                val searchLocation = ticket.searchLocation
-                val maxRadiusMeters = ticket.maxRadiusMeters
-                val targetDivision = ticket.targetDivision
                 val userId = ticket.userId
+                val nearbyMatches = obtainNearbyMatchesFromTicket(ticket)
 
-                matchService.getNearbyOpenMatches(searchLocation.y, searchLocation.x, maxRadiusMeters, targetDivision)
-                    .forEach { match ->
-                        val matchId = requireNotNull(match.id)
-                        if (matchService.numberOfPlayersInMatch(matchId) == 3) {
-                            matchService.joinMatch(matchId, userId)
-                            matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
-                            logger.info("Matchmaking Engine: Match found and joined: $matchId")
-                            return@forEach
-                        }
-                    }
+                attemptToJoinMatch(nearbyMatches, userId)
             }
-
         } catch (e: Exception) {
             // If one match calculation crashes, we catch it here so the engine
             // doesn't die. It will wake up again in 10 seconds.
             logger.error("Matchmaking Engine encountered an error: ${e.message}", e)
         }
     }
+
+    private fun obtainNearbyMatchesFromTicket(ticket: MatchmakingTicket): List<MatchResponseDTO> {
+        val searchLocation = ticket.searchLocation
+        val maxRadiusMeters = ticket.maxRadiusMeters
+        val targetDivision = ticket.targetDivision
+        val nearbyMatches = matchService.getNearbyOpenMatches(searchLocation.y, searchLocation.x, maxRadiusMeters, targetDivision)
+        return nearbyMatches
+    }
+
+    private fun attemptToJoinMatch(
+        nearbyMatches: List<MatchResponseDTO>,
+        userId: UUID
+    ) {
+        for (match in nearbyMatches) {
+            val matchId = requireNotNull(match.id)
+            try {
+                matchService.joinMatch(matchId, userId)
+                matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
+                logger.info("Matchmaking Engine: User $userId joined match $matchId")
+
+                break
+
+            } catch (e: Exception) {
+                logger.warn("Failed to join match $matchId: ${e.message}")
+            }
+        }
+    }
+
     private fun handleExpiredTicket(ticket: MatchmakingTicket) {
         matchmakingService.leaveQueue(ticket.userId, TicketStatus.EXPIRED)
         logger.info("Matchmaking Engine: Ticket ${ticket.id} expired (less than 30m remaining or past endTime)")
