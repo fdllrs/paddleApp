@@ -3,6 +3,7 @@ package com.paddle.app.engine
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
+import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
@@ -31,6 +32,8 @@ class MatchmakingEngineTest {
     private lateinit var matchService: MatchService
     @MockK
     private lateinit var matchmakingService: MatchmakingService
+    @MockK
+    private lateinit var courtRepository: CourtRepository
     @SpyK
     private var geometryFactory = GeometryFactory()
 
@@ -41,7 +44,6 @@ class MatchmakingEngineTest {
 
     @InjectMockKs
     private lateinit var matchmakingEngine: MatchmakingEngine
-
 
     @Test
     fun `queueing player joins a compatible match and ticket is updated`() {
