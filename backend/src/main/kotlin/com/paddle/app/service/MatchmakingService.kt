@@ -20,12 +20,13 @@ class MatchmakingService(
     private val userRepository: UserRepository,
     private val matchmakingTicketRepository: MatchmakingTicketRepository,
     private val geometryFactory: GeometryFactory,
-    private val clubRepository: ClubRepository
+    private val clubRepository: ClubRepository,
+    private val matchService: MatchService,
 ) {
     companion object {
         const val STATUS_SEARCHING = "SEARCHING"
         const val STATUS_CANCELLED = "CANCELLED"
-        const val STATUS_EXPIRED = "EXIPRED"
+        const val STATUS_EXPIRED = "EXPIRED"
         const val STATUS_MATCHED = "MATCHED"
     }
 
@@ -46,12 +47,17 @@ class MatchmakingService(
 
         val newMatchmakingTicket = MatchmakingTicket(
             userId = userId,
-            startTime = request.startTime,
-            endTime = request.endTime,
             targetDivision = user.division,
             searchLocation = searchLocation,
-            status = TicketStatus.SEARCHING,
             maxRadiusMeters = request.radiusMeters,
+            startTime = request.startTime,
+            endTime = request.endTime,
+            status = TicketStatus.SEARCHING,
+            preferredClubId = request.preferredClubId,
+            preferredCourtId = request.preferredCourtId,
+            preferredMatchDate = request.preferredDate,
+            preferredDurationMinutes = request.preferredDurationMinutes,
+
         )
 
         val savedTicket = matchmakingTicketRepository.save(newMatchmakingTicket)
@@ -93,6 +99,7 @@ class MatchmakingService(
     fun queueIsEmpty(): Boolean {
         return matchmakingTicketRepository.count() == 0L
     }
+
 
     private fun assertQueueJoiningIsValid(userId: UUID, request: QueueRequestDTO) {
         val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING)

@@ -22,7 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import com.paddle.app.repository.ClubRepository
+import com.paddle.app.repository.CourtRepository
 import org.junit.jupiter.api.Assertions.assertNotNull
+import java.time.OffsetTime
 import kotlin.test.assertEquals
 
 
@@ -37,6 +39,12 @@ class MatchmakingServiceTest {
 
     @MockK
     private lateinit var clubRepository: ClubRepository
+
+    @MockK
+    private lateinit var courtRepository: CourtRepository
+
+    @MockK
+    private lateinit var matchService: MatchService
 
     @SpyK
     private var geometryFactory = GeometryFactory()
@@ -53,6 +61,10 @@ class MatchmakingServiceTest {
             radiusMeters = 1000.0,
             startTime = OffsetDateTime.now(),
             endTime = OffsetDateTime.now().minusHours(1),
+            preferredDate = OffsetDateTime.now().plusHours(4),
+            preferredDurationMinutes = 60,
+            preferredClubId = UUID.randomUUID(),
+            preferredCourtId = UUID.randomUUID()
         )
 
         val result = matchmakingService.isValidRequest(request)
@@ -70,7 +82,11 @@ class MatchmakingServiceTest {
             longitude = -3.7037,
             radiusMeters = 5000.0,
             startTime = OffsetDateTime.now(),
-            endTime = OffsetDateTime.now().plusHours(1)
+            endTime = OffsetDateTime.now().plusHours(5),
+            preferredDate = OffsetDateTime.now().plusHours(4),
+            preferredDurationMinutes = 90,
+            preferredClubId = UUID.randomUUID(),
+            preferredCourtId = UUID.randomUUID()
         )
         val searchLocation = geometryFactory.createPoint(
             Coordinate(request.longitude, request.latitude)
@@ -78,12 +94,16 @@ class MatchmakingServiceTest {
         val newMatchmakingTicket = MatchmakingTicket(
             id = UUID.randomUUID(),
             userId = myId,
-            startTime = request.startTime,
-            endTime = request.endTime,
             targetDivision = mockUser.division,
             searchLocation = searchLocation,
-            status = TicketStatus.SEARCHING,
             maxRadiusMeters = request.radiusMeters,
+            startTime = request.startTime,
+            endTime = request.endTime,
+            status = TicketStatus.SEARCHING,
+            preferredClubId = request.preferredClubId,
+            preferredCourtId = request.preferredCourtId,
+            preferredMatchDate = request.preferredDate,
+            preferredDurationMinutes = request.preferredDurationMinutes
         )
 
 
@@ -110,7 +130,10 @@ class MatchmakingServiceTest {
             id = UUID.randomUUID(),
             name = "Central Padel",
             location = geometryFactory.createPoint(Coordinate(40.4180, -3.7050)),
-            address = "Central Padel address"
+            address = "Central Padel address",
+            neighborhood = "Central Padel neighborhood",
+            openTime = OffsetTime.parse("10:00:00Z"),
+            closeTime = OffsetTime.parse("22:00:00Z")
         )
 
         every {

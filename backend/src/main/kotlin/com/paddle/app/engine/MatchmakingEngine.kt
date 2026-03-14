@@ -1,12 +1,15 @@
 package com.paddle.app.engine
 
+import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
+import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
 import org.slf4j.LoggerFactory
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock
@@ -18,6 +21,7 @@ class MatchmakingEngine(
     private val ticketRepository: MatchmakingTicketRepository,
     private val matchService: MatchService,
     private val matchmakingService: MatchmakingService,
+    private val courtRepository: CourtRepository,
     private val clock: Clock
 ) {
     private val logger = LoggerFactory.getLogger(MatchmakingEngine::class.java)
@@ -37,8 +41,10 @@ class MatchmakingEngine(
                 }
                 val userId = ticket.userId
                 val nearbyMatches = obtainNearbyMatchesFromTicket(ticket)
+                val userId = ticket.userId
 
-                attemptToJoinMatch(nearbyMatches, userId)
+                if (tryJoinExistingMatch(nearbyMatches, ticket)) continue
+                createFallbackMatch(ticket, userId)
             }
         } catch (e: Exception) {
             // If one match calculation crashes, we catch it here so the engine
@@ -72,6 +78,20 @@ class MatchmakingEngine(
                 logger.warn("Failed to join match $matchId: ${e.message}")
             }
         }
+    }
+
+    private fun createMatchRequestFromPreferences(ticket: MatchmakingTicket): MatchCreateRequestDTO {
+        val court = courtRepository.findByIdOrNull(ticket.preferredCourtId) ?: throw IllegalArgumentException("Court not found")
+
+        val request = MatchCreateRequestDTO(
+            hostId = ticket.userId,
+            courtId = ticket.preferredCourtId,
+            matchDate = ticket.preferredMatchDate,
+            targetDivision = ticket.targetDivision,
+            durationMinutes = ticket.preferredDurationMinutes,
+            pricePerPerson = court.pricePerTurn.div(4.toBigDecimal())
+        )
+        return request
     }
 
     private fun handleExpiredTicket(ticket: MatchmakingTicket) {

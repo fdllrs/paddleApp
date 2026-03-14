@@ -22,6 +22,9 @@ class MatchmakingTicket (
     @Column(name = "user_id")
     var userId: UUID,
 
+    @Column(name = "partner_id")
+    var partnerId: UUID? = null,
+
     @Column(name = "target_division", nullable = false)
     val targetDivision: Int,
 
@@ -42,6 +45,18 @@ class MatchmakingTicket (
 
     @Column(name = "matched_match_id")
     var matchedMatchId: UUID? = null,
+
+    @Column(name = "preferred_club_id")
+    val preferredClubId: UUID,
+
+    @Column(name = "preferred_court_id")
+    val preferredCourtId: UUID,
+
+    @Column(name = "preferred_match_date")
+    val preferredMatchDate: OffsetDateTime,
+
+    @Column(name = "preferred_duration_minutes")
+    val preferredDurationMinutes: Int = 90,
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -68,7 +83,9 @@ class MatchmakingTicket (
         this.status = status
     }
 
-
+    fun isSoloQ(): Boolean {
+        return this.partnerId == null
+    }
 }
 enum class TicketStatus {
     SEARCHING,

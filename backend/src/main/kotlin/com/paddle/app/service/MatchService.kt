@@ -4,12 +4,13 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
 import com.paddle.app.dto.toResponseDTO
-import com.paddle.app.model.Club
+import com.paddle.app.model.Court
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchPlayer
 import com.paddle.app.model.MatchStatus
 import com.paddle.app.model.User
 import com.paddle.app.repository.ClubRepository
+import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
 import com.paddle.app.repository.UserRepository
@@ -28,7 +29,7 @@ import java.util.UUID
 class MatchService(
     private val matchRepository: MatchRepository,
     private val userRepository: UserRepository,
-    private val clubRepository: ClubRepository,
+    private val courtRepository: CourtRepository,
     private val matchPlayerRepository: MatchPlayerRepository,
     ) {
 
@@ -36,7 +37,7 @@ class MatchService(
         const val MATCH_NOT_FOUND_MESSAGE = "Match not found"
         const val USER_NOT_FOUND_MESSAGE = "User not found"
         const val MATCH_FULL_MESSAGE = "Match is full"
-        const val CLUB_NOT_FOUND_MESSAGE = "Club not found"
+        const val COURT_NOT_FOUND_MESSAGE = "Court not found"
         const val USER_ALREADY_IN_MATCH_MESSAGE = "User is already in this match"
         const val HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE = "Host cannot leave the match"
         const val USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE = "User is not a player in this match"
@@ -78,11 +79,11 @@ class MatchService(
 
     fun createMatch(request: MatchCreateRequestDTO): MatchResponseDTO {
         val host = findUserById(request.hostId)
-        val club = findClubById(request.clubId)
+        val court = findCourtById(request.courtId)
 
         val newMatch = Match(
             host = host,
-            club = club,
+            court = court,
             matchDate = request.matchDate,
             durationMinutes = request.durationMinutes,
             pricePerPerson = request.pricePerPerson,
@@ -151,9 +152,9 @@ class MatchService(
             ?: throw IllegalArgumentException(USER_NOT_FOUND_MESSAGE))
     }
 
-    private fun findClubById(clubId: UUID): Club {
-        return (clubRepository.findByIdOrNull(clubId)
-            ?: throw IllegalArgumentException(CLUB_NOT_FOUND_MESSAGE))
+    private fun findCourtById(courtId: UUID): Court {
+        return (courtRepository.findByIdOrNull(courtId)
+            ?: throw IllegalArgumentException(COURT_NOT_FOUND_MESSAGE))
     }
 
     private fun assertMatchIsOpen(match: Match) {

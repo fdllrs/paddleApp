@@ -2,6 +2,7 @@ package com.paddle.app.model
 
 import jakarta.persistence.*
 import org.hibernate.annotations.CreationTimestamp
+import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -15,18 +16,19 @@ class Match (
     val id: UUID? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "host_id", nullable = false)
+    @JoinColumn(name = "host", nullable = false)
     var host: User,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "club_id", nullable = false)
-    var club: Club,
+    @JoinColumn(name = "court", nullable = false)
+    var court: Court,
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     var status: MatchStatus = MatchStatus.OPEN,
 
     @Column(name = "start_date", nullable = false)
-    var matchDate: OffsetDateTime? = null,
+    var matchDate: OffsetDateTime,
 
     @Column(name = "target_division", nullable = false)
     var targetDivision: Int,
@@ -34,8 +36,8 @@ class Match (
     @Column(name = "duration_minutes", nullable = false)
     var durationMinutes: Int = 90,
 
-    @Column(name = "price_per_person", nullable = false)
-    var pricePerPerson: Float,
+    @Column(name = "price_per_person", nullable = false, precision = 10, scale = 2)
+    var pricePerPerson: BigDecimal,
 
 
     @CreationTimestamp
@@ -46,36 +48,17 @@ class Match (
         this.status = status
     }
 
-    fun isOpen(): Boolean {
-        return this.status == MatchStatus.OPEN
-    }
-    fun isFull(): Boolean {
-        return this.status == MatchStatus.FULL
-    }
-    fun isCancelled(): Boolean {
-        return this.status == MatchStatus.CANCELLED
-    }
-    fun isPlayed(): Boolean {
-        return this.status == MatchStatus.PLAYED
-    }
+    fun isOpen() = this.status == MatchStatus.OPEN
+    fun isFull() = this.status == MatchStatus.FULL
+    fun isCancelled() = this.status == MatchStatus.CANCELLED
+    fun isPlayed() = this.status == MatchStatus.PLAYED
 
-    fun markAsCancelled() {
-        this.markAs(MatchStatus.CANCELLED)
-    }
-    fun markAsFull() {
-        this.markAs(MatchStatus.FULL)
-    }
-    fun markAsPlayed() {
-        this.markAs(MatchStatus.PLAYED)
-    }
-    fun markAsOpen() {
-        this.markAs(MatchStatus.OPEN)
-    }
+    fun markAsCancelled() = markAs(MatchStatus.CANCELLED)
+    fun markAsFull() = markAs(MatchStatus.FULL)
+    fun markAsPlayed() = markAs(MatchStatus.PLAYED)
+    fun markAsOpen() = markAs(MatchStatus.OPEN)
 
-    fun isHost(userId: UUID): Boolean {
-        return this.host.id == userId
-    }
-
+    fun isHost(userId: UUID) = this.host.id == userId
 
 }
 

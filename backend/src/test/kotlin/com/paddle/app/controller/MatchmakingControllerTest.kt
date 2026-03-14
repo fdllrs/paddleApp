@@ -45,7 +45,11 @@ class MatchmakingControllerTest {
             longitude = -58.3816,
             radiusMeters = 5000.0,
             startTime = OffsetDateTime.now().plusHours(1),
-            endTime = OffsetDateTime.now().plusHours(3)
+            endTime = OffsetDateTime.now().plusHours(3),
+            preferredDate = OffsetDateTime.now().plusHours(2),
+            preferredDurationMinutes = 90,
+            preferredClubId = UUID.randomUUID(),
+            preferredCourtId = UUID.randomUUID()
         )
 
         every { matchmakingService.joinQueue(any(), any()) } returns expectedTicketId

@@ -2,11 +2,14 @@ package com.paddle.app.service
 
 import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.model.Club
+import com.paddle.app.model.Court
+import com.paddle.app.model.FloorType
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchPlayer
 import com.paddle.app.model.MatchStatus
 import com.paddle.app.model.User
-import com.paddle.app.repository.ClubRepository
+import com.paddle.app.model.WallType
+import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
 import com.paddle.app.repository.UserRepository
@@ -28,6 +31,7 @@ import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.dao.DataIntegrityViolationException
 import java.time.OffsetDateTime
+import java.time.OffsetTime
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertTrue
@@ -42,7 +46,7 @@ class MatchServiceTest {
     private lateinit var userRepository: UserRepository
 
     @MockK
-    private lateinit var clubRepository: ClubRepository
+    private lateinit var courtRepository: CourtRepository
 
     @MockK
     private lateinit var matchPlayerRepository: MatchPlayerRepository
@@ -55,54 +59,68 @@ class MatchServiceTest {
 
     private fun testMatchCreateRequestDTO(
         hostId: UUID = UUID.randomUUID(),
-        clubId: UUID = UUID.randomUUID(),
+        courtId: UUID = UUID.randomUUID(),
         matchDate: OffsetDateTime = fixedDateTime
     ): MatchCreateRequestDTO =
         MatchCreateRequestDTO(
             hostId = hostId,
-            clubId = clubId,
+            courtId = courtId,
             matchDate = matchDate,
             durationMinutes = 90,
-            pricePerPerson = 15f,
+            pricePerPerson = 15.toBigDecimal(),
             targetDivision = 5
         )
 
     private fun testUser(
         id: UUID = UUID.randomUUID(),
-        name: String = "Test User",
         division: Int = 5
     ): User =
         User(
             id = id,
-            displayName = name,
+            displayName = "Test User",
             division = division
         )
 
     private fun testClub(
-        id: UUID = UUID.randomUUID(),
-        name: String = "Test Club"
+        id: UUID = UUID.randomUUID()
     ): Club =
         Club(
             id = id,
-            name = name,
+            name = "Test Club",
             address = "123 St",
-            location = geometryFactory.createPoint(Coordinate(-58.0, -34.0))
+            location = geometryFactory.createPoint(Coordinate(-58.0, -34.0)),
+            openTime = OffsetTime.parse("10:00:00Z"),
+            closeTime = OffsetTime.parse("22:00:00Z"),
+            neighborhood = "VILLA ADELINA"
         )
+    private fun testCourt(
+        id: UUID = UUID.randomUUID(),
+        club: Club = testClub()
+    ): Court = Court(
+        id = id,
+        club = club,
+        name = "test Court",
+        pricePerTurn = 15.toBigDecimal(),
+        covered = false,
+        wallType = WallType.BRICK,
+        floorType = FloorType.SYNTHETIC_GRASS
+    )
+
 
     private fun testMatch(
         id: UUID = UUID.randomUUID(),
         host: User = testUser(),
-        club: Club = testClub(),
+        court: Court = testCourt(),
         date: OffsetDateTime = fixedDateTime,
         status: MatchStatus = MatchStatus.OPEN
     ): Match =
         Match(
             id = id,
             host = host,
-            club = club,
+            court = court,
             matchDate = date,
             durationMinutes = 90,
-            pricePerPerson = 15f,
+            pricePerPerson = 15.toBigDecimal(),
             targetDivision = 5,
             status = status
         )
@@ -120,8 +138,8 @@ class MatchServiceTest {
         every { userRepository.findById(requireNotNull(user.id)) } returns Optional.of(user)
     }
 
-    private fun givenClubExists(club: Club) {
-        every { clubRepository.findById(requireNotNull(club.id)) } returns Optional.of(club)
+    private fun givenCourtExists(court: Court) {
+        every { courtRepository.findById(requireNotNull(court.id)) } returns Optional.of(court)
     }
 
     private fun givenMatchExists(match: Match) {
@@ -132,8 +150,8 @@ class MatchServiceTest {
         every { userRepository.findById(userId) } returns Optional.empty()
     }
 
-    private fun givenClubMissing(clubId: UUID) {
-        every { clubRepository.findById(clubId) } returns Optional.empty()
+    private fun givenCourtMissing(clubId: UUID) {
+        every { courtRepository.findById(clubId) } returns Optional.empty()
     }
 
     private fun givenMatchMissing(matchId: UUID) {
@@ -146,17 +164,17 @@ class MatchServiceTest {
         @Test
         fun `createMatch should save match and automatically join the host`() {
             // Arrange
-            val host = testUser(name = "John Doe")
-            val club = testClub(name = "Test Club")
+            val host = testUser()
+            val court = testCourt()
             val request = testMatchCreateRequestDTO(
                 hostId = requireNotNull(host.id),
-                clubId = requireNotNull(club.id),
+                courtId = requireNotNull(court.id),
                 matchDate = fixedDateTime
             )
-            val match = testMatch(host = host, club = club, date = request.matchDate)
+            val match = testMatch(host = host, court = court, date = request.matchDate)
 
             givenUserExists(host)
-            givenClubExists(club)
+            givenCourtExists(court)
             givenMatchExists(match)
 
 
@@ -169,7 +187,7 @@ class MatchServiceTest {
 
             // Assert
             assertEquals(match.id, response.id)
-            assertEquals(club.name, response.clubName)
+            assertEquals(court.club.name, response.clubName)
             assertEquals(host.displayName, response.hostName)
             verify(exactly = 1) { matchRepository.save(any()) }
             verify(exactly = 1) { matchPlayerRepository.save(any()) }
@@ -181,11 +199,11 @@ class MatchServiceTest {
             val host = testUser()
             val request = testMatchCreateRequestDTO(
                 hostId = requireNotNull(host.id),
-                clubId = UUID.randomUUID()
+                courtId = UUID.randomUUID()
             )
 
             givenUserExists(host)
-            givenClubMissing(request.clubId)
+            givenCourtMissing(request.courtId)
 
             // Act
             val exception = assertThrows<IllegalArgumentException> {
@@ -193,7 +211,7 @@ class MatchServiceTest {
             }
 
             // Assert
-            assertEquals(MatchService.CLUB_NOT_FOUND_MESSAGE, exception.message)
+            assertEquals(MatchService.COURT_NOT_FOUND_MESSAGE, exception.message)
             verify(exactly = 0) { matchRepository.save(any()) }
         }
     }
@@ -204,10 +222,10 @@ class MatchServiceTest {
         @Test
         fun `joinMatch correctly joins a user to a match`() {
             // Arrange
-            val player = testUser(name = "Player")
-            val host = testUser(name = "Host")
-            val club = testClub()
-            val match = testMatch(host = host, club = club)
+            val player = testUser()
+            val host = testUser()
+            val court = testCourt()
+            val match = testMatch(host = host, court = court)
 
             givenUserExists(player)
             givenMatchExists(match)

@@ -39,15 +39,12 @@ class MatchController(private val matchService: MatchService) {
         return matchService.getMatchesForPlayer(userId)
     }
 
-
-
     @PostMapping("/{matchId}/join")
     fun joinMatch(
         @PathVariable matchId: UUID,
         @RequestParam userId: UUID
-    ): String {
-        matchService.joinMatch(matchId, userId)
-        return "successfully joined the match"
+    ) {
+        return matchService.joinMatch(matchId, userId)
     }
 
     @PostMapping
