@@ -34,12 +34,8 @@ class MatchmakingEngine(
             val openTickets = ticketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING)
 
             for (ticket in openTickets) {
+                if (ticket.isExpired(OffsetDateTime.now(clock))) { handleExpiredTicket(ticket); continue }
 
-                if (ticket.isExpired(OffsetDateTime.now(clock))) {
-                    handleExpiredTicket(ticket)
-                    continue
-                }
-                val userId = ticket.userId
                 val nearbyMatches = obtainNearbyMatchesFromTicket(ticket)
                 val userId = ticket.userId
 
@@ -47,10 +43,44 @@ class MatchmakingEngine(
                 createFallbackMatch(ticket, userId)
             }
         } catch (e: Exception) {
-            // If one match calculation crashes, we catch it here so the engine
-            // doesn't die. It will wake up again in 10 seconds.
             logger.error("Matchmaking Engine encountered an error: ${e.message}", e)
         }
+    }
+
+    private fun tryJoinExistingMatch(
+        nearbyMatches: List<MatchResponseDTO>,
+        ticket: MatchmakingTicket,
+    ): Boolean {
+        val userId = ticket.userId
+        if (nearbyMatches.isEmpty()) return false
+
+        if (ticket.isSoloQ()) {
+            return (attemptToJoinMatch(nearbyMatches, userId))
+        }
+
+        val duoCompatibleMatches = matchService.filterDuoCompatibleMatches(nearbyMatches)
+        if (duoCompatibleMatches.isEmpty()) return false
+
+        val partnerId = ticket.partnerId!!
+        return attemptToJoinDuoMatch(duoCompatibleMatches, userId, partnerId)
+    }
+
+    private fun createFallbackMatch(ticket: MatchmakingTicket, userId: UUID) {
+        val matchResponseDTO = createDTOFromPreference(ticket)
+        matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
+
+        if (!ticket.isSoloQ()) {
+            matchService.joinMatch(matchResponseDTO.id!!, ticket.partnerId!!)
+            logger.info("Matchmaking Engine: User $userId created match ${matchResponseDTO.id} and ${ticket.partnerId} joined")
+        } else {
+            logger.info("Matchmaking Engine: User $userId created match ${matchResponseDTO.id}")
+        }
+    }
+
+    private fun createDTOFromPreference(ticket: MatchmakingTicket): MatchResponseDTO {
+        val matchRequest = createMatchRequestFromPreferences(ticket)
+        val matchResponseDTO = matchService.createMatch(matchRequest)
+        return matchResponseDTO
     }
 
     private fun obtainNearbyMatchesFromTicket(ticket: MatchmakingTicket): List<MatchResponseDTO> {
@@ -64,7 +94,7 @@ class MatchmakingEngine(
     private fun attemptToJoinMatch(
         nearbyMatches: List<MatchResponseDTO>,
         userId: UUID
-    ) {
+    ): Boolean {
         for (match in nearbyMatches) {
             val matchId = requireNotNull(match.id)
             try {
@@ -72,12 +102,45 @@ class MatchmakingEngine(
                 matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
                 logger.info("Matchmaking Engine: User $userId joined match $matchId")
 
-                break
+                return true
 
             } catch (e: Exception) {
                 logger.warn("Failed to join match $matchId: ${e.message}")
             }
         }
+        return false
+    }
+
+    private fun attemptToJoinDuoMatch(
+        duoCompatibleMatches: List<MatchResponseDTO>,
+        userId: UUID,
+        partnerId: UUID
+    ): Boolean {
+        for (match in duoCompatibleMatches) {
+            val matchId = requireNotNull(match.id)
+
+            try {
+                matchService.joinMatch(matchId, userId)
+            } catch (e: Exception) {
+                logger.warn("First player in duo failed to join match $matchId: ${e.message}")
+                continue
+            }
+
+            try {
+                matchService.joinMatch(matchId, partnerId)
+            } catch (e: Exception) {
+                logger.warn("Second player in duo failed to join match $matchId: ${e.message}. Rolling back.")
+                matchService.leaveMatch(matchId, userId)
+                continue
+            }
+
+            matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
+            logger.info("Matchmaking Engine: Duo ($userId, $partnerId) joined match $matchId")
+
+            return true
+        }
+
+        return false
     }
 
     private fun createMatchRequestFromPreferences(ticket: MatchmakingTicket): MatchCreateRequestDTO {
@@ -98,7 +161,4 @@ class MatchmakingEngine(
         matchmakingService.leaveQueue(ticket.userId, TicketStatus.EXPIRED)
         logger.info("Matchmaking Engine: Ticket ${ticket.id} expired (less than 30m remaining or past endTime)")
     }
-
-
-
 }

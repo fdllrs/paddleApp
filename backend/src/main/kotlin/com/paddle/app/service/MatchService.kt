@@ -61,7 +61,6 @@ class MatchService(
         val matchPlayers = matchPlayerRepository.findByMatchId(matchId)
 
         return matchPlayers.map {it.player.toResponseDTO()}
-
     }
 
     fun numberOfPlayersInMatch(matchId: UUID): Int {
@@ -142,7 +141,12 @@ class MatchService(
         // TODO: Fetch matchPlayerRepository.findByMatchId(matchId) and send push notifications to other users
     }
 
-
+    fun filterDuoCompatibleMatches(matches: List<MatchResponseDTO>): List<MatchResponseDTO> {
+        return matches.filter { match ->
+            val matchId = requireNotNull(match.id)
+            numberOfPlayersInMatch(matchId) >= 3
+        }
+    }
     fun isPlayerInMatch(matchId: UUID, playerId: UUID): Boolean {
         return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == playerId }
     }
