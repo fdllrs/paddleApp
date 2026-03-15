@@ -46,12 +46,11 @@ class Court (
 
 
 enum class WallType {
-    BRICK,
+    CEMENT,
     GLASS
 }
 
 enum class FloorType {
     CEMENT,
-    GRASS,
     SYNTHETIC_GRASS
 }

@@ -31,7 +31,7 @@ fun Match.toResponseDTO(): MatchResponseDTO {
     return MatchResponseDTO(
         id = this.id,
         status = this.status,
-        matchDate = this.matchDate,
+        matchDate = this.startDate,
         durationMinutes = this.durationMinutes,
         pricePerPerson = this.pricePerPerson,
         hostId = this.host.id,
