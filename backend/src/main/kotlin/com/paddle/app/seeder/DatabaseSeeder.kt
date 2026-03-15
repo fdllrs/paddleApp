@@ -18,7 +18,6 @@ import org.springframework.boot.CommandLineRunner
 import org.springframework.stereotype.Component
 import java.time.OffsetDateTime
 import java.time.OffsetTime
-import java.util.UUID
 
 
 @Component
@@ -49,12 +48,13 @@ class DatabaseSeeder(
             name = "test Court",
             pricePerTurn = 15.toBigDecimal(),
             covered = false,
-            wallType = WallType.BRICK,
+            wallType = WallType.CEMENT,
             floorType = FloorType.SYNTHETIC_GRASS
         )
         val testMatch = Match(
             host = testUser,
-            matchDate = OffsetDateTime.now().plusDays(1),
+            startDate = OffsetDateTime.now().plusDays(1),
+            endDate = OffsetDateTime.now().plusDays(1).plusMinutes(90),
             status = MatchStatus.OPEN,
             court = testCourt,
             targetDivision = 7,

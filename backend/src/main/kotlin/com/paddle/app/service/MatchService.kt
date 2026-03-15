@@ -9,7 +9,6 @@ import com.paddle.app.model.Match
 import com.paddle.app.model.MatchPlayer
 import com.paddle.app.model.MatchStatus
 import com.paddle.app.model.User
-import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
@@ -83,7 +82,8 @@ class MatchService(
         val newMatch = Match(
             host = host,
             court = court,
-            matchDate = request.matchDate,
+            startDate = request.matchDate,
+            endDate = request.matchDate.plusMinutes(request.durationMinutes.toLong()),
             durationMinutes = request.durationMinutes,
             pricePerPerson = request.pricePerPerson,
             status = MatchStatus.OPEN,

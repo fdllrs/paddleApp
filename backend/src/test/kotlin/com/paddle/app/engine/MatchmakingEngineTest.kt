@@ -154,7 +154,7 @@ class MatchmakingEngineTest {
         // Engine finds 2 nearby matches
         every { matchService.getNearbyOpenMatches(any(), any(), any(), any()) } returns listOf(match1, match2)
 
-        // match1 throws an exception (e.g. game is full)
+        // match1 throws an exception (e.g., game is full)
         every { matchService.joinMatch(matchId1, userId) } throws IllegalStateException("Match full")
         // match2 succeeds
         every { matchService.joinMatch(matchId2, userId) } just Runs

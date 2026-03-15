@@ -102,7 +102,7 @@ class MatchServiceTest {
         name = "test Court",
         pricePerTurn = 15.toBigDecimal(),
         covered = false,
-        wallType = WallType.BRICK,
+        wallType = WallType.CEMENT,
         floorType = FloorType.SYNTHETIC_GRASS
     )
 
@@ -118,7 +118,8 @@ class MatchServiceTest {
             id = id,
             host = host,
             court = court,
-            matchDate = date,
+            startDate = date,
+            endDate = date.plusMinutes(90),
             durationMinutes = 90,
             pricePerPerson = 15.toBigDecimal(),
             targetDivision = 5,

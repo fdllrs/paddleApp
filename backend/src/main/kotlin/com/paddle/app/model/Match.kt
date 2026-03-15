@@ -28,7 +28,10 @@ class Match (
     var status: MatchStatus = MatchStatus.OPEN,
 
     @Column(name = "start_date", nullable = false)
-    var matchDate: OffsetDateTime,
+    var startDate: OffsetDateTime,
+
+    @Column(name = "end_date", nullable = false)
+    var endDate: OffsetDateTime,
 
     @Column(name = "target_division", nullable = false)
     var targetDivision: Int,
