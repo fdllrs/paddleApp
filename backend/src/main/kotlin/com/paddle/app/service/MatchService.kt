@@ -75,15 +75,22 @@ class MatchService(
         return matches.map {it.match.toResponseDTO()}
     }
 
+    @Transactional
     fun createMatch(request: MatchCreateRequestDTO): MatchResponseDTO {
-        val host = findUserById(request.hostId)
         val court = findCourtById(request.courtId)
+        val courtId = requireNotNull(court.id)
+        val startDate = request.startDate
+        val endDate = startDate.plusMinutes(request.durationMinutes.toLong())
+
+        if(matchRepository.overlappingMatches(courtId, startDate, endDate).isNotEmpty()) throw IllegalArgumentException("Court is already booked for this time window")
+
+        val host = findUserById(request.hostId)
 
         val newMatch = Match(
             host = host,
             court = court,
-            startDate = request.matchDate,
-            endDate = request.matchDate.plusMinutes(request.durationMinutes.toLong()),
+            startDate = startDate,
+            endDate = endDate,
             durationMinutes = request.durationMinutes,
             pricePerPerson = request.pricePerPerson,
             status = MatchStatus.OPEN,
@@ -157,7 +164,7 @@ class MatchService(
     }
 
     private fun findCourtById(courtId: UUID): Court {
-        return (courtRepository.findByIdOrNull(courtId)
+        return (courtRepository.findCourtById(courtId)
             ?: throw IllegalArgumentException(COURT_NOT_FOUND_MESSAGE))
     }
 

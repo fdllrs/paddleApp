@@ -149,7 +149,7 @@ class MatchmakingEngine(
         val request = MatchCreateRequestDTO(
             hostId = ticket.userId,
             courtId = ticket.preferredCourtId,
-            matchDate = ticket.preferredMatchDate,
+            startDate = ticket.preferredMatchDate,
             targetDivision = ticket.targetDivision,
             durationMinutes = ticket.preferredDurationMinutes,
             pricePerPerson = court.pricePerTurn.div(4.toBigDecimal())

@@ -65,7 +65,7 @@ class MatchServiceTest {
         MatchCreateRequestDTO(
             hostId = hostId,
             courtId = courtId,
-            matchDate = matchDate,
+            startDate = matchDate,
             durationMinutes = 90,
             pricePerPerson = 15.toBigDecimal(),
             targetDivision = 5
@@ -172,7 +172,7 @@ class MatchServiceTest {
                 courtId = requireNotNull(court.id),
                 matchDate = fixedDateTime
             )
-            val match = testMatch(host = host, court = court, date = request.matchDate)
+            val match = testMatch(host = host, court = court, date = request.startDate)
 
             givenUserExists(host)
             givenCourtExists(court)
