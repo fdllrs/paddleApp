@@ -15,12 +15,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
-import java.time.Clock
-import java.time.Instant
 import java.time.OffsetDateTime
-import java.time.ZoneId
 import java.util.UUID
 import io.mockk.impl.annotations.InjectMockKs
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 @ExtendWith(MockKExtension::class)
 class MatchmakingEngineTest {
@@ -41,6 +42,7 @@ class MatchmakingEngineTest {
         Instant.parse("2026-03-12T10:00:00Z"),
         ZoneId.of("UTC")
     )
+    private val fixedDateTime: OffsetDateTime = clock.instant().atOffset(ZoneOffset.UTC)
 
     @InjectMockKs
     private lateinit var matchmakingEngine: MatchmakingEngine
@@ -50,7 +52,6 @@ class MatchmakingEngineTest {
         // Arrange
         val userId = UUID.randomUUID()
         val matchId = UUID.randomUUID()
-        val now = OffsetDateTime.now()
 
         val ticket = MatchmakingTicket(
             id = UUID.randomUUID(),
@@ -58,12 +59,12 @@ class MatchmakingEngineTest {
             targetDivision = 4,
             searchLocation = geometryFactory.createPoint(Coordinate(-3.7038, 40.4168)),
             maxRadiusMeters = 5000.0,
-            startTime = now.plusDays(100),
-            endTime = now.plusDays(300),
+            startTime = fixedDateTime.plusDays(100),
+            endTime = fixedDateTime.plusDays(300),
             status = TicketStatus.SEARCHING,
             preferredCourtId = UUID.randomUUID(),
             preferredClubId = UUID.randomUUID(),
-            preferredMatchDate = now.plusDays(200),
+            preferredMatchDate = fixedDateTime.plusDays(200),
             preferredDurationMinutes = 90
         )
 
@@ -94,9 +95,8 @@ class MatchmakingEngineTest {
 
     @Test
     fun `matchmaking ticket expires if start time is in less than 30 min`() {
-        val now = OffsetDateTime.now(clock)
 
-        val startTime = now.plusMinutes(25)
+        val startTime = fixedDateTime.plusMinutes(25)
         val expiredTicket = MatchmakingTicket(
             userId = UUID.randomUUID(),
             targetDivision = 4,
@@ -131,19 +131,18 @@ class MatchmakingEngineTest {
         val userId = UUID.randomUUID()
         val matchId1 = UUID.randomUUID()
         val matchId2 = UUID.randomUUID()
-        val now = OffsetDateTime.now(clock)
 
         val ticket = MatchmakingTicket(
             userId = userId,
             targetDivision = 4,
             searchLocation = geometryFactory.createPoint(Coordinate(0.0, 0.0)),
             maxRadiusMeters = 5000.0,
-            startTime = now.plusDays(1),
-            endTime = now.plusDays(2),
+            startTime = fixedDateTime.plusDays(1),
+            endTime = fixedDateTime.plusDays(2),
             status = TicketStatus.SEARCHING,
             preferredCourtId = UUID.randomUUID(),
             preferredClubId = UUID.randomUUID(),
-            preferredMatchDate = now.plusDays(1),
+            preferredMatchDate = fixedDateTime.plusDays(1),
             preferredDurationMinutes = 90
         )
 

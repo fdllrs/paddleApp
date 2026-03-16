@@ -41,6 +41,7 @@ class MatchService(
         const val HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE = "Host cannot leave the match"
         const val USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE = "User is not a player in this match"
         const val ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE = "Only the host can cancel the match"
+        const val COURT_ALREADY_BOOKED_MESSAGE = "Court is already booked for this time window"
 
 
     }
@@ -82,7 +83,9 @@ class MatchService(
         val startDate = request.startDate
         val endDate = startDate.plusMinutes(request.durationMinutes.toLong())
 
-        if(matchRepository.overlappingMatches(courtId, startDate, endDate).isNotEmpty()) throw IllegalArgumentException("Court is already booked for this time window")
+        if(matchRepository.overlappingMatches(courtId, startDate, endDate).isNotEmpty()) throw IllegalArgumentException(
+            COURT_ALREADY_BOOKED_MESSAGE
+        )
 
         val host = findUserById(request.hostId)
 
