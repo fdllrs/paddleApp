@@ -21,6 +21,10 @@ import com.paddle.app.model.TicketStatus
 import io.mockk.Runs
 import io.mockk.just
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 @WebMvcTest(MatchmakingController::class)
 class MatchmakingControllerTest {
@@ -34,23 +38,32 @@ class MatchmakingControllerTest {
     @MockkBean
     private lateinit var matchmakingService: MatchmakingService
 
+    private val clock: Clock = Clock.fixed(
+        Instant.parse("2026-03-12T10:00:00Z"),
+        ZoneId.of("UTC")
+    )
+    private val fixedDateTime: OffsetDateTime = clock.instant().atOffset(ZoneOffset.UTC)
+
+
+    private fun testQueueRequestDTO(): QueueRequestDTO = QueueRequestDTO(
+        latitude = -34.6037,
+        longitude = -58.3816,
+        radiusMeters = 5000.0,
+        startTime = fixedDateTime.plusHours(1),
+        endTime = fixedDateTime.plusHours(3),
+        preferredDate = fixedDateTime.plusHours(2),
+        preferredDurationMinutes = 90,
+        preferredClubId = UUID.randomUUID(),
+        preferredCourtId = UUID.randomUUID()
+    )
+
     @Test
     fun `POST queue returns 202 Accepted and the ticket ID`() {
         // --- ARRANGE ---
         val userId = UUID.randomUUID()
         val expectedTicketId = UUID.randomUUID()
 
-        val requestDto = QueueRequestDTO(
-            latitude = -34.6037,
-            longitude = -58.3816,
-            radiusMeters = 5000.0,
-            startTime = OffsetDateTime.now().plusHours(1),
-            endTime = OffsetDateTime.now().plusHours(3),
-            preferredDate = OffsetDateTime.now().plusHours(2),
-            preferredDurationMinutes = 90,
-            preferredClubId = UUID.randomUUID(),
-            preferredCourtId = UUID.randomUUID()
-        )
+        val requestDto = testQueueRequestDTO()
 
         every { matchmakingService.joinQueue(any(), any()) } returns expectedTicketId
 
@@ -64,6 +77,8 @@ class MatchmakingControllerTest {
             .andExpect(status().isAccepted) // Asserts HTTP 202
             .andExpect(content().string(objectMapper.writeValueAsString(expectedTicketId))) // Asserts the body contains the UUID
     }
+
+
 
     @Test
     fun `GET queue status returns OK status with ticketId`(){

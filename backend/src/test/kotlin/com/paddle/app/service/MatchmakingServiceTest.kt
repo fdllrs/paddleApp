@@ -24,7 +24,12 @@ import org.locationtech.jts.geom.GeometryFactory
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.CourtRepository
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.locationtech.jts.geom.Point
+import java.time.Clock
+import java.time.Instant
 import java.time.OffsetTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 
 
@@ -52,19 +57,54 @@ class MatchmakingServiceTest {
     @InjectMockKs
     private lateinit var matchmakingService: MatchmakingService
 
+    private val clock: Clock = Clock.fixed(
+        Instant.parse("2026-03-12T10:00:00Z"),
+        ZoneId.of("UTC")
+    )
+    private val fixedDateTime: OffsetDateTime = clock.instant().atOffset(ZoneOffset.UTC)
+
+
+    private fun testQueueRequestDTO(
+        startTime: OffsetDateTime = fixedDateTime,
+        endTime: OffsetDateTime = fixedDateTime.plusHours(3),
+        preferredDate: OffsetDateTime = fixedDateTime.plusHours(1),
+    ): QueueRequestDTO = QueueRequestDTO(
+        latitude = 0.0,
+        longitude = 0.0,
+        radiusMeters = 1000.0,
+        startTime = startTime,
+        endTime = endTime,
+        preferredDate = preferredDate,
+        preferredDurationMinutes = 60,
+        preferredClubId = UUID.randomUUID(),
+        preferredCourtId = UUID.randomUUID()
+    )
+
+    private fun testTicket(
+        myId: UUID = UUID.randomUUID(),
+        mockUser: User,
+        searchLocation: Point,
+        request: QueueRequestDTO
+    ): MatchmakingTicket = MatchmakingTicket(
+        id = UUID.randomUUID(),
+        userId = myId,
+        targetDivision = mockUser.division,
+        searchLocation = searchLocation,
+        maxRadiusMeters = request.radiusMeters,
+        startTime = request.startTime,
+        endTime = request.endTime,
+        status = TicketStatus.SEARCHING,
+        preferredClubId = request.preferredClubId,
+        preferredCourtId = request.preferredCourtId,
+        preferredMatchDate = request.preferredDate,
+        preferredDurationMinutes = request.preferredDurationMinutes
+    )
 
     @Test
     fun `should reject request if end time is before start time`() {
-        val request = QueueRequestDTO(
-            latitude = 0.0,
-            longitude = 0.0,
-            radiusMeters = 1000.0,
-            startTime = OffsetDateTime.now(),
-            endTime = OffsetDateTime.now().minusHours(1),
-            preferredDate = OffsetDateTime.now().plusHours(4),
-            preferredDurationMinutes = 60,
-            preferredClubId = UUID.randomUUID(),
-            preferredCourtId = UUID.randomUUID()
+        val request = testQueueRequestDTO(
+            startTime = fixedDateTime.plusHours(1),
+            endTime = fixedDateTime,
         )
 
         val result = matchmakingService.isValidRequest(request)
@@ -72,39 +112,23 @@ class MatchmakingServiceTest {
         assertFalse(result)
     }
 
+
+
     @Test
     fun `can store a single player`() {
         val myId = UUID.randomUUID()
         val mockUser = User(displayName = "Nazareno", id = myId, division = 3)
 
-        val request = QueueRequestDTO(
-            latitude = 40.4167,
-            longitude = -3.7037,
-            radiusMeters = 5000.0,
-            startTime = OffsetDateTime.now(),
-            endTime = OffsetDateTime.now().plusHours(5),
-            preferredDate = OffsetDateTime.now().plusHours(4),
-            preferredDurationMinutes = 90,
-            preferredClubId = UUID.randomUUID(),
-            preferredCourtId = UUID.randomUUID()
+        val request = testQueueRequestDTO(
+            startTime = fixedDateTime,
+            endTime = fixedDateTime.plusHours(5),
+            preferredDate = fixedDateTime.plusHours(4)
         )
+
         val searchLocation = geometryFactory.createPoint(
             Coordinate(request.longitude, request.latitude)
         )
-        val newMatchmakingTicket = MatchmakingTicket(
-            id = UUID.randomUUID(),
-            userId = myId,
-            targetDivision = mockUser.division,
-            searchLocation = searchLocation,
-            maxRadiusMeters = request.radiusMeters,
-            startTime = request.startTime,
-            endTime = request.endTime,
-            status = TicketStatus.SEARCHING,
-            preferredClubId = request.preferredClubId,
-            preferredCourtId = request.preferredCourtId,
-            preferredMatchDate = request.preferredDate,
-            preferredDurationMinutes = request.preferredDurationMinutes
-        )
+        val newMatchmakingTicket = testTicket(myId, mockUser, searchLocation, request)
 
 
         every { userRepository.findUserById(myId) } returns mockUser
@@ -119,6 +143,8 @@ class MatchmakingServiceTest {
         assertFalse(matchmakingService.queueIsEmpty())
         assertTrue(matchmakingService.isPlayerInQueue(myId))
     }
+
+
 
     @Test
     fun `should return a list of clubs found in the intersection of two players`() {

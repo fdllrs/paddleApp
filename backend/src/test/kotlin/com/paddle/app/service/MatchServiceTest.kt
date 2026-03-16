@@ -21,6 +21,7 @@ import io.mockk.junit5.MockKExtension
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -111,16 +112,17 @@ class MatchServiceTest {
         id: UUID = UUID.randomUUID(),
         host: User = testUser(),
         court: Court = testCourt(),
-        date: OffsetDateTime = fixedDateTime,
+        startDate: OffsetDateTime = fixedDateTime,
+        durationMinutes: Int = 90,
         status: MatchStatus = MatchStatus.OPEN
     ): Match =
         Match(
             id = id,
             host = host,
             court = court,
-            startDate = date,
-            endDate = date.plusMinutes(90),
-            durationMinutes = 90,
+            startDate = startDate,
+            endDate = startDate.plusMinutes(durationMinutes.toLong()),
+            durationMinutes = durationMinutes,
             pricePerPerson = 15.toBigDecimal(),
             targetDivision = 5,
             status = status
@@ -140,7 +142,7 @@ class MatchServiceTest {
     }
 
     private fun givenCourtExists(court: Court) {
-        every { courtRepository.findById(requireNotNull(court.id)) } returns Optional.of(court)
+        every { courtRepository.findCourtById(requireNotNull(court.id)) } returns court
     }
 
     private fun givenMatchExists(match: Match) {
@@ -151,13 +153,28 @@ class MatchServiceTest {
         every { userRepository.findById(userId) } returns Optional.empty()
     }
 
-    private fun givenCourtMissing(clubId: UUID) {
-        every { courtRepository.findById(clubId) } returns Optional.empty()
+    private fun givenCourtMissing(courtId: UUID) {
+        every { courtRepository.findCourtById(courtId) } returns null
     }
 
     private fun givenMatchMissing(matchId: UUID) {
         every { matchRepository.findById(matchId) } returns Optional.empty()
     }
+
+    private fun requestHasNoOverlappingMatches() {
+        every { matchRepository.overlappingMatches(any(), any(), any()) } returns emptyList()
+    }
+
+    private fun verifyMatchSavedWithCorrectDates(request: MatchCreateRequestDTO) {
+        verify(exactly = 1) {
+            matchRepository.save(withArg { savedMatch ->
+                savedMatch.startDate == request.startDate &&
+                        savedMatch.endDate == request.startDate.plusMinutes(request.durationMinutes.toLong())
+
+            })
+        }
+    }
+
 
     @Nested
     inner class CreateMatchTest {
@@ -167,35 +184,52 @@ class MatchServiceTest {
             // Arrange
             val host = testUser()
             val court = testCourt()
+            val courtId = requireNotNull(court.id)
             val request = testMatchCreateRequestDTO(
                 hostId = requireNotNull(host.id),
                 courtId = requireNotNull(court.id),
                 matchDate = fixedDateTime
             )
-            val match = testMatch(host = host, court = court, date = request.startDate)
+            val match = testMatch(host = host, court = court, startDate = request.startDate)
+            val matchId = requireNotNull(match.id)
 
             givenUserExists(host)
             givenCourtExists(court)
             givenMatchExists(match)
+            requestHasNoOverlappingMatches()
 
 
             every { matchRepository.save(any()) } returns match
-            every { matchPlayerRepository.findByMatchId(match.id!!) } returns listOf(testMatchPlayer(player = host, match = match))
+            every { matchPlayerRepository.findByMatchId(match.id!!) } returns listOf(
+                testMatchPlayer(
+                    player = host,
+                    match = match
+                )
+            )
             every { matchPlayerRepository.save(any()) } returns mockk()
-
             // Act
             val response = matchService.createMatch(request)
 
             // Assert
-            assertEquals(match.id, response.id)
+            verifyOrder {
+                courtRepository.findCourtById(courtId)
+                matchRepository.overlappingMatches(courtId, fixedDateTime, fixedDateTime.plusMinutes(90))
+            }
+
+            assertEquals(matchId, response.id)
             assertEquals(court.club.name, response.clubName)
             assertEquals(host.displayName, response.hostName)
-            verify(exactly = 1) { matchRepository.save(any()) }
-            verify(exactly = 1) { matchPlayerRepository.save(any()) }
+            verifyMatchSavedWithCorrectDates(request)
+            verify(exactly = 1) {
+                matchPlayerRepository.save(withArg { savedMatchPlayer ->
+                    assertEquals(savedMatchPlayer.player.id, host.id)
+                    assertEquals(savedMatchPlayer.match.id, matchId)
+                })
+            }
         }
 
         @Test
-        fun `createMatch should throw exception when club is not found`() {
+        fun `createMatch should throw exception when court is not found`() {
             // Arrange
             val host = testUser()
             val request = testMatchCreateRequestDTO(
@@ -205,6 +239,7 @@ class MatchServiceTest {
 
             givenUserExists(host)
             givenCourtMissing(request.courtId)
+            requestHasNoOverlappingMatches()
 
             // Act
             val exception = assertThrows<IllegalArgumentException> {
@@ -214,8 +249,65 @@ class MatchServiceTest {
             // Assert
             assertEquals(MatchService.COURT_NOT_FOUND_MESSAGE, exception.message)
             verify(exactly = 0) { matchRepository.save(any()) }
+
         }
-    }
+
+        @Test
+        fun `createMatch should throw exception when user is not found`() {
+            // Arrange
+            val host = testUser()
+            val court = testCourt()
+            val courtId = requireNotNull(court.id)
+            val request = testMatchCreateRequestDTO(
+                hostId = requireNotNull(host.id),
+                courtId = courtId
+            )
+
+            givenUserMissing(requireNotNull(host.id))
+            givenCourtExists(court)
+            requestHasNoOverlappingMatches()
+
+            // Act
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.createMatch(request)
+            }
+
+            // Assert
+            assertEquals(MatchService.USER_NOT_FOUND_MESSAGE, exception.message)
+            verify(exactly = 0) { matchRepository.save(any()) }
+
+        }
+
+        @Test
+        fun `createMatch should not allow user to create matches with equal start times`() {
+
+            val host = testUser()
+            val court = testCourt()
+            val courtId = requireNotNull(court.id)
+            val bookedMatch = testMatch(startDate = fixedDateTime)
+            val request = testMatchCreateRequestDTO(courtId = courtId, hostId = requireNotNull(host.id), matchDate = fixedDateTime)
+
+
+            givenCourtExists(court)
+            givenUserExists(host)
+            every { matchRepository.overlappingMatches(courtId, fixedDateTime, fixedDateTime.plusMinutes(90)) } returns listOf(bookedMatch)
+
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.createMatch(request)
+            }
+
+            // Assert
+            assertEquals(MatchService.COURT_ALREADY_BOOKED_MESSAGE, exception.message)
+            verifyOrder {
+                    courtRepository.findCourtById(courtId)
+                    matchRepository.overlappingMatches(courtId, fixedDateTime, fixedDateTime.plusMinutes(90))
+                    }
+            verify(exactly = 0) { matchRepository.save(any()) }
+        }
+
+       }
+
+
 
     @Nested
     inner class JoinMatchTest {
