@@ -112,7 +112,6 @@ class MatchControllerTest {
             .andExpect(jsonPath("$.totalPages").value(1))
     }
 
-
     @Test
     fun `POST match deserializes JSON payload and returns matched DTO`() {
         // --- ARRANGE ---

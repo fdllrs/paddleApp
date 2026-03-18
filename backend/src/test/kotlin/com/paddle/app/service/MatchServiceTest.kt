@@ -296,8 +296,6 @@ class MatchServiceTest {
 
        }
 
-
-
     @Nested
     inner class JoinMatchTest {
 
@@ -366,7 +364,7 @@ class MatchServiceTest {
         }
 
         @Test
-        fun `joinMatch should throw exception when match is full`() {
+        fun `joinMatch should throw exception when match is not open`() {
             // Arrange
             val player = testUser()
             val closedMatch = testMatch(status = MatchStatus.FULL)

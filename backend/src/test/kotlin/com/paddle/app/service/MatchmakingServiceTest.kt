@@ -1,35 +1,28 @@
 package com.paddle.app.service
 
+import com.paddle.app.dto.QueueRequestDTO
+import com.paddle.app.model.Club
+import com.paddle.app.model.MatchmakingTicket
+import com.paddle.app.model.TicketStatus
+import com.paddle.app.model.User
+import com.paddle.app.repository.ClubRepository
+import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.repository.UserRepository
-import com.paddle.app.dto.QueueRequestDTO
-import com.paddle.app.model.MatchmakingTicket
-import com.paddle.app.model.User
-import com.paddle.app.model.Club
-import com.paddle.app.model.TicketStatus
 import io.mockk.every
-import io.mockk.verify
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
-import java.time.OffsetDateTime
-import java.util.UUID
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
 import io.mockk.impl.annotations.SpyK
 import io.mockk.junit5.MockKExtension
+import io.mockk.verify
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
-import com.paddle.app.repository.ClubRepository
-import com.paddle.app.repository.CourtRepository
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.locationtech.jts.geom.Point
-import java.time.Clock
-import java.time.Instant
-import java.time.OffsetTime
-import java.time.ZoneId
-import java.time.ZoneOffset
+import java.time.*
+import java.util.*
 import kotlin.test.assertEquals
 
 
@@ -112,10 +105,8 @@ class MatchmakingServiceTest {
         assertFalse(result)
     }
 
-
-
     @Test
-    fun `can store a single player`() {
+    fun `can store a single player in queue`() {
         val myId = UUID.randomUUID()
         val mockUser = User(displayName = "Nazareno", id = myId, division = 3)
 
@@ -143,8 +134,6 @@ class MatchmakingServiceTest {
         assertFalse(matchmakingService.queueIsEmpty())
         assertTrue(matchmakingService.isPlayerInQueue(myId))
     }
-
-
 
     @Test
     fun `should return a list of clubs found in the intersection of two players`() {
