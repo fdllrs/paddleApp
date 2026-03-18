@@ -4,6 +4,8 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
 import com.paddle.app.service.MatchService
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -48,8 +50,9 @@ class MatchController(private val matchService: MatchService) {
     }
 
     @PostMapping
-    fun createMatch(@RequestBody request: MatchCreateRequestDTO): MatchResponseDTO {
-        return matchService.createMatch(request)
+    fun createMatch(@RequestBody request: MatchCreateRequestDTO): ResponseEntity<MatchResponseDTO> {
+        val responseDTO = matchService.createMatch(request)
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO)
 
     }
 

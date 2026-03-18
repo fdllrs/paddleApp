@@ -30,7 +30,7 @@ class MatchmakingController(private val matchmakingService: MatchmakingService) 
     @GetMapping("/queue/status")
     fun getQueueStatus(@RequestParam userId: UUID): ResponseEntity<QueueStatusResponseDTO> {
         val ticketStatus = matchmakingService.getTicketStatusForUser(userId)
-        return ResponseEntity.ok(ticketStatus)
+        return ResponseEntity.status(HttpStatus.OK).body(ticketStatus)
     }
 
     @DeleteMapping("/queue")

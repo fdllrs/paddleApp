@@ -65,7 +65,7 @@ class MatchmakingControllerTest {
 
         val requestDto = testQueueRequestDTO()
 
-        every { matchmakingService.joinQueue(any(), any()) } returns expectedTicketId
+        every { matchmakingService.joinQueue(requestDto, userId) } returns expectedTicketId
 
         // --- ACT & ASSERT ---
         mockMvc.perform(
@@ -106,7 +106,7 @@ class MatchmakingControllerTest {
         // --- ARRANGE ---
         val userId = UUID.randomUUID()
 
-        every { matchmakingService.leaveQueue(any(), any()) } just Runs
+        every { matchmakingService.leaveQueue(userId, TicketStatus.CANCELLED) } just Runs
 
         // --- ACT & ASSERT ---
         mockMvc.perform(
