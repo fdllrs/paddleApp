@@ -48,7 +48,7 @@ class MatchController(private val matchService: MatchService) {
         @RequestParam userId: UUID
     ): ResponseEntity<Void> {
         matchService.joinMatch(matchId, userId)
-        return ResponseEntity.ok().build()
+        return ResponseEntity.noContent().build()
     }
 
     @PostMapping

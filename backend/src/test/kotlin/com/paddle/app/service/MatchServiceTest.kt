@@ -1,27 +1,15 @@
 package com.paddle.app.service
 
 import com.paddle.app.dto.MatchCreateRequestDTO
-import com.paddle.app.model.Club
-import com.paddle.app.model.Court
-import com.paddle.app.model.FloorType
-import com.paddle.app.model.Match
-import com.paddle.app.model.MatchPlayer
-import com.paddle.app.model.MatchStatus
-import com.paddle.app.model.User
-import com.paddle.app.model.WallType
+import com.paddle.app.model.*
 import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
 import com.paddle.app.repository.UserRepository
-import io.mockk.Runs
-import io.mockk.every
+import io.mockk.*
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
-import io.mockk.just
-import io.mockk.mockk
-import io.mockk.verify
-import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -31,10 +19,11 @@ import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.Pageable
 import java.time.OffsetDateTime
 import java.time.OffsetTime
-import java.util.Optional
-import java.util.UUID
+import java.util.*
 import kotlin.test.assertTrue
 
 @ExtendWith(MockKExtension::class)
@@ -428,13 +417,15 @@ class MatchServiceTest {
             val longitude = -58.0
             val radiusMeters = 5000.0
             val targetDivision = 7
+            val pagedResponse = PageImpl(listOf(testMatch()))
+
 
             every {
-                matchRepository.findNearbyMatches(any(), any(), any(), any())
-            } returns listOf(testMatch())
+                matchRepository.findNearbyMatches(any(), any(), any(), any(), any())
+            } returns pagedResponse
 
             // Act
-            matchService.getNearbyOpenMatches(latitude, longitude, radiusMeters, targetDivision)
+            matchService.getNearbyOpenMatches(latitude, longitude, radiusMeters, targetDivision, Pageable.unpaged())
 
             // Assert
             verify(exactly = 1) {
@@ -445,7 +436,8 @@ class MatchServiceTest {
                         assertEquals(longitude, point.x)
                     },
                     eq(radiusMeters),
-                    eq(targetDivision)
+                    eq(targetDivision),
+                    any()
                 )
             }
         }

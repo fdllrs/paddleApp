@@ -9,12 +9,15 @@ import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.OffsetDateTime
-import java.util.UUID
+import java.util.*
 
 @Component
 class MatchmakingEngine(
@@ -36,11 +39,22 @@ class MatchmakingEngine(
             for (ticket in openTickets) {
                 if (ticket.isExpired(OffsetDateTime.now(clock))) { handleExpiredTicket(ticket); continue }
 
-                val nearbyMatches = obtainNearbyMatchesFromTicket(ticket)
+                var joinedMatch = false
+                var nearbyMatches: Page<MatchResponseDTO>
                 val userId = ticket.userId
+                var currentPage = 0
 
-                if (tryJoinExistingMatch(nearbyMatches, ticket)) continue
-                createFallbackMatch(ticket, userId)
+                do {
+                    val pageable = PageRequest.of(currentPage, 50)
+                    nearbyMatches = obtainNearbyMatchesFromTicket(ticket, pageable)
+
+                    if (tryJoinExistingMatch(nearbyMatches.content, ticket)) { joinedMatch = true; break }
+
+                    currentPage++
+
+                } while (nearbyMatches.hasNext())
+
+                if (!joinedMatch) createFallbackMatch(ticket, userId)
             }
         } catch (e: Exception) {
             logger.error("Matchmaking Engine encountered an error: ${e.message}", e)
@@ -83,12 +97,14 @@ class MatchmakingEngine(
         return matchResponseDTO
     }
 
-    private fun obtainNearbyMatchesFromTicket(ticket: MatchmakingTicket): List<MatchResponseDTO> {
+    private fun obtainNearbyMatchesFromTicket(ticket: MatchmakingTicket, pageable: Pageable): Page<MatchResponseDTO> {
         val searchLocation = ticket.searchLocation
         val maxRadiusMeters = ticket.maxRadiusMeters
         val targetDivision = ticket.targetDivision
-        val nearbyMatches = matchService.getNearbyOpenMatches(searchLocation.y, searchLocation.x, maxRadiusMeters, targetDivision)
+        val nearbyMatches = matchService.getNearbyOpenMatches(searchLocation.y, searchLocation.x, maxRadiusMeters,
+            targetDivision, pageable)
         return nearbyMatches
+
     }
 
     private fun attemptToJoinMatch(

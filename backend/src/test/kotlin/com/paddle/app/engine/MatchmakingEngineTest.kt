@@ -8,6 +8,7 @@ import com.paddle.app.repository.MatchmakingTicketRepository
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
 import io.mockk.*
+import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
 import io.mockk.impl.annotations.SpyK
 import io.mockk.junit5.MockKExtension
@@ -15,13 +16,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
-import java.time.OffsetDateTime
-import java.util.UUID
-import io.mockk.impl.annotations.InjectMockKs
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
+import org.springframework.data.domain.PageImpl
+import java.time.*
+import java.util.*
 
 @ExtendWith(MockKExtension::class)
 class MatchmakingEngineTest {
@@ -71,6 +68,7 @@ class MatchmakingEngineTest {
         val mockMatchDTO = mockk<MatchResponseDTO> {
             every { id } returns matchId
         }
+        val pagedResponse = PageImpl(listOf(mockMatchDTO))
 
         every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(ticket)
 
@@ -79,9 +77,10 @@ class MatchmakingEngineTest {
                 ticket.searchLocation.y,
                 ticket.searchLocation.x,
                 ticket.maxRadiusMeters,
-                ticket.targetDivision
+                ticket.targetDivision,
+                any()
             )
-        } returns listOf(mockMatchDTO)
+        } returns pagedResponse
 
         every { matchService.joinMatch(matchId, userId) } just Runs
         every { matchmakingService.leaveQueue(userId, any()) } just Runs
@@ -122,7 +121,7 @@ class MatchmakingEngineTest {
         }
 
         verify(exactly = 0) {
-            matchService.getNearbyOpenMatches(any(), any(), any(), any())
+            matchService.getNearbyOpenMatches(any(), any(), any(), any(), any())
         }
     }
 
@@ -149,9 +148,11 @@ class MatchmakingEngineTest {
         val match1 = mockk<MatchResponseDTO> { every { id } returns matchId1 }
         val match2 = mockk<MatchResponseDTO> { every { id } returns matchId2 }
 
+        val pagedResponse = PageImpl(listOf(match1, match2))
+
         every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(ticket)
         // Engine finds 2 nearby matches
-        every { matchService.getNearbyOpenMatches(any(), any(), any(), any()) } returns listOf(match1, match2)
+        every { matchService.getNearbyOpenMatches(any(), any(), any(), any(), any()) } returns pagedResponse
 
         // match1 throws an exception (e.g., game is full)
         every { matchService.joinMatch(matchId1, userId) } throws IllegalStateException("Match full")
