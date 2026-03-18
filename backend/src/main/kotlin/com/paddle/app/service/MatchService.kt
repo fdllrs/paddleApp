@@ -4,11 +4,7 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
 import com.paddle.app.dto.toResponseDTO
-import com.paddle.app.model.Court
-import com.paddle.app.model.Match
-import com.paddle.app.model.MatchPlayer
-import com.paddle.app.model.MatchStatus
-import com.paddle.app.model.User
+import com.paddle.app.model.*
 import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
 import com.paddle.app.repository.MatchRepository
@@ -17,11 +13,12 @@ import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.PrecisionModel
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.util.UUID
-
+import java.util.*
 
 
 @Service
@@ -50,11 +47,13 @@ class MatchService(
         latitude: Double,
         longitude: Double,
         radiusMeters: Double,
-        targetDivision: Int): List<MatchResponseDTO> {
+        targetDivision: Int,
+        page: Pageable
+        ): Page<MatchResponseDTO> {
 
         val userLocationPoint = createPointFromCoordinates(longitude, latitude)
 
-        return matchRepository.findNearbyMatches(MatchStatus.OPEN, userLocationPoint, radiusMeters, targetDivision).map { it.toResponseDTO() }
+        return matchRepository.findNearbyMatches(MatchStatus.OPEN, userLocationPoint, radiusMeters, targetDivision, page).map { it.toResponseDTO() }
     }
 
     fun getPlayersFromMatch(matchId: UUID): List<UserResponseDTO> {

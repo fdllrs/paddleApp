@@ -2,23 +2,28 @@ package com.paddle.app.repository
 
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchStatus
-import jakarta.persistence.LockModeType
 import org.locationtech.jts.geom.Point
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.OffsetDateTime
-import java.util.UUID
+import java.util.*
 
 interface MatchRepository: JpaRepository<Match, UUID> {
 
-    @Query("SELECT m FROM Match m JOIN m.court ct JOIN ct.club c WHERE m.status = :status AND distance(c.location, :userLocation) <= :radius AND m.targetDivision = :targetDivision")
+    @Query(
+        "SELECT m FROM Match m JOIN m.court ct JOIN ct.club c WHERE m.status = :status AND distance(c.location, " +
+            ":userLocation) <= :radius AND m.targetDivision = :targetDivision",
+        countQuery = "SELECT COUNT(m) FROM Match m JOIN m.court ct JOIN ct.club c WHERE m.status = :status AND distance" +
+                "(c.location, :userLocation) <= :radius AND m.targetDivision = :targetDivision")
     fun findNearbyMatches(@Param("status") status: MatchStatus,
                           @Param("userLocation") userLocation: Point,
                           @Param("radius") radius: Double,
-                          @Param("targetDivision") targetDivision: Int
-    ): List<Match>
+                          @Param("targetDivision") targetDivision: Int,
+                          pageable: Pageable
+    ): Page<Match>
 
 
 
