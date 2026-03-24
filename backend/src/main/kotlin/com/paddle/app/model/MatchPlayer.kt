@@ -13,11 +13,9 @@ class MatchPlayer (
     @GeneratedValue(strategy = GenerationType.UUID)
     val id: UUID? = null,
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "match_id", nullable = false)
     var match: Match,
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "player_id", nullable = false)

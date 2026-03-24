@@ -5,7 +5,7 @@ import org.hibernate.annotations.CreationTimestamp
 import org.locationtech.jts.geom.Point
 import java.time.OffsetDateTime
 import java.time.OffsetTime
-import java.util.UUID
+import java.util.*
 
 @Entity
 @Table(name = "clubs")
@@ -21,8 +21,7 @@ class Club (
     var address: String,
 
     @Column(columnDefinition = "geography(Point, 4326)", name = "coordinates", nullable = false)
-    var location: Point,
-
+    var coordinates: Point,
 
     @Column(name = "open_time", nullable = false)
     var openTime: OffsetTime,

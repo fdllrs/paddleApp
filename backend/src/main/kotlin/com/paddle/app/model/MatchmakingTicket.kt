@@ -1,15 +1,12 @@
 package com.paddle.app.model
 
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.GeneratedValue
-import jakarta.persistence.GenerationType
-import jakarta.persistence.Id
-import jakarta.persistence.Table
+import jakarta.persistence.*
 import org.hibernate.annotations.CreationTimestamp
-import java.time.OffsetDateTime
-import java.util.UUID
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import org.locationtech.jts.geom.Point
+import java.time.OffsetDateTime
+import java.util.*
 
 
 @Entity
@@ -19,7 +16,7 @@ class MatchmakingTicket (
     @GeneratedValue(strategy = GenerationType.UUID)
     val id: UUID? = null,
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false)
     var userId: UUID,
 
     @Column(name = "partner_id")
@@ -28,7 +25,8 @@ class MatchmakingTicket (
     @Column(name = "target_division", nullable = false)
     val targetDivision: Int,
 
-    @Column(name = "search_location", nullable = false)
+
+    @Column(name = "search_location", columnDefinition = "geography(Point, 4326)", nullable = false)
     val searchLocation: Point,
 
     @Column(name = "max_radius_meters", nullable = false)
@@ -40,17 +38,19 @@ class MatchmakingTicket (
     @Column(name = "end_time", nullable = false)
     val endTime: OffsetDateTime,
 
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     var status: TicketStatus,
 
     @Column(name = "matched_match_id")
     var matchedMatchId: UUID? = null,
 
-    @Column(name = "preferred_club_id")
-    val preferredClubId: UUID,
-
     @Column(name = "preferred_court_id")
     val preferredCourtId: UUID,
+
+    @Column(name = "preferred_club_id")
+    val preferredClubId: UUID,
 
     @Column(name = "preferred_match_date")
     val preferredMatchDate: OffsetDateTime,

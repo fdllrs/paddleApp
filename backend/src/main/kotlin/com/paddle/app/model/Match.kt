@@ -2,6 +2,8 @@ package com.paddle.app.model
 
 import jakarta.persistence.*
 import org.hibernate.annotations.CreationTimestamp
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -16,13 +18,14 @@ class Match (
     val id: UUID? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "host", nullable = false)
+    @JoinColumn(name = "host_id", nullable = false)
     var host: User,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "court", nullable = false)
+    @JoinColumn(name = "court_id", nullable = false)
     var court: Court,
 
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     var status: MatchStatus = MatchStatus.OPEN,
@@ -41,7 +44,6 @@ class Match (
 
     @Column(name = "price_per_person", nullable = false, precision = 10, scale = 2)
     var pricePerPerson: BigDecimal,
-
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

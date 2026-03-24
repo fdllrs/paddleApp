@@ -41,8 +41,8 @@ fun Match.toResponseDTO(): MatchResponseDTO {
         clubName = this.court.club.name,
         courtId = this.court.id,
         courtName = this.court.name,
-        latitude = this.court.club.location.y,
-        longitude = this.court.club.location.x
+        latitude = this.court.club.coordinates.y,
+        longitude = this.court.club.coordinates.x
     )
 }
 

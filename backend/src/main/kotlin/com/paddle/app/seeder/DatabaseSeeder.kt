@@ -1,12 +1,6 @@
 package com.paddle.app.seeder
 
-import com.paddle.app.model.Club
-import com.paddle.app.model.Court
-import com.paddle.app.model.FloorType
-import com.paddle.app.model.Match
-import com.paddle.app.model.MatchStatus
-import com.paddle.app.model.User
-import com.paddle.app.model.WallType
+import com.paddle.app.model.*
 import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchRepository
@@ -38,9 +32,9 @@ class DatabaseSeeder(
         val testClub = Club(
                 name = "dummy club Obelisco",
                 address = "Obelisco paddle 123",
-                location = geometryFactory.createPoint(Coordinate(-58.0, -34.0)),
-                openTime = OffsetTime.parse("10:00:00"),
-                closeTime = OffsetTime.parse("22:00:00"),
+                coordinates = geometryFactory.createPoint(Coordinate(-58.0, -34.0)),
+                openTime = OffsetTime.parse("10:00:00Z"),
+                closeTime = OffsetTime.parse("22:00:00Z"),
                 neighborhood = "VILLA ADELINA"
             )
         val testCourt = Court(

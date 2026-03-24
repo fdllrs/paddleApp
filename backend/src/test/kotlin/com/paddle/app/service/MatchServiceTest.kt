@@ -78,7 +78,7 @@ class MatchServiceTest {
             id = id,
             name = "Test Club",
             address = "123 St",
-            location = geometryFactory.createPoint(Coordinate(-58.0, -34.0)),
+            coordinates = geometryFactory.createPoint(Coordinate(-58.0, -34.0)),
             openTime = OffsetTime.parse("10:00:00Z"),
             closeTime = OffsetTime.parse("22:00:00Z"),
             neighborhood = "VILLA ADELINA"

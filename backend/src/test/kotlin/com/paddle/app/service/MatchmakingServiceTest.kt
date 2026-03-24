@@ -135,34 +135,4 @@ class MatchmakingServiceTest {
         assertTrue(matchmakingService.isPlayerInQueue(myId))
     }
 
-    @Test
-    fun `should return a list of clubs found in the intersection of two players`() {
-        val p1Loc = geometryFactory.createPoint(Coordinate(40.4168, -3.7038))
-        val p2Loc = geometryFactory.createPoint(Coordinate(40.4200, -3.7100))
-        val radius = 2000.0
-
-        val expectedClub = Club(
-            id = UUID.randomUUID(),
-            name = "Central Padel",
-            location = geometryFactory.createPoint(Coordinate(40.4180, -3.7050)),
-            address = "Central Padel address",
-            neighborhood = "Central Padel neighborhood",
-            openTime = OffsetTime.parse("10:00:00Z"),
-            closeTime = OffsetTime.parse("22:00:00Z")
-        )
-
-        every {
-            clubRepository.findClubsInIntersection(p1Loc, radius, p2Loc, radius)
-        } returns listOf(expectedClub)
-
-        val result = matchmakingService.getClubsForMatchmaking(p1Loc, p2Loc, radius, radius)
-
-        assertNotNull(result)
-        assertEquals(1, result.size)
-        assertEquals(result[0], expectedClub)
-
-        verify(exactly = 1) {
-            clubRepository.findClubsInIntersection(p1Loc, radius, p2Loc, radius)
-        }
-    }
 }

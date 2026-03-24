@@ -36,6 +36,8 @@ class MatchmakingEngine(
         try {
             val openTickets = ticketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING)
 
+            logger.info("Matchmaking Engine: found ${openTickets.size} open tickets")
+
             for (ticket in openTickets) {
                 if (ticket.isExpired(OffsetDateTime.now(clock))) { handleExpiredTicket(ticket); continue }
 

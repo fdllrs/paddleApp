@@ -14,10 +14,11 @@ import java.util.*
 interface MatchRepository: JpaRepository<Match, UUID> {
 
     @Query(
-        "SELECT m FROM Match m JOIN m.court ct JOIN ct.club c WHERE m.status = :status AND distance(c.location, " +
+        "SELECT m FROM Match m JOIN m.court ct JOIN ct.club c WHERE m.status = :status AND distance(c.coordinates, " +
             ":userLocation) <= :radius AND m.targetDivision = :targetDivision",
         countQuery = "SELECT COUNT(m) FROM Match m JOIN m.court ct JOIN ct.club c WHERE m.status = :status AND distance" +
-                "(c.location, :userLocation) <= :radius AND m.targetDivision = :targetDivision")
+                "(c.coordinates, :userLocation) <= :radius AND m.targetDivision = :targetDivision"
+    )
     fun findNearbyMatches(@Param("status") status: MatchStatus,
                           @Param("userLocation") userLocation: Point,
                           @Param("radius") radius: Double,

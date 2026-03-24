@@ -74,15 +74,6 @@ class MatchmakingService(
         matchmakingTicketRepository.save(ticket)
     }
 
-    fun getClubsForMatchmaking(p1Loc: Point, p2Loc: Point, p1radius: Double, p2radius: Double): List<Club>{
-        return clubRepository.findClubsInIntersection(
-            p1Loc,
-            p1radius,
-            p2Loc,
-            p2radius
-        )
-    }
-
     fun isPlayerInQueue(playerID: UUID): Boolean {
         return matchmakingTicketRepository.existsByUserId(playerID)
     }
