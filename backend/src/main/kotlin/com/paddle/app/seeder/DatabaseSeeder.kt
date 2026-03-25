@@ -28,7 +28,7 @@ class DatabaseSeeder(
         val geometryFactory = GeometryFactory(PrecisionModel(), 4326)
 
 
-        val testUser = User(displayName = "Facundo", division = 7)
+        val testUser = User(displayName = "Facundo", division = 7, firebaseUid = "123")
         val testClub = Club(
                 name = "dummy club Obelisco",
                 address = "Obelisco paddle 123",

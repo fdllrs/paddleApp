@@ -11,4 +11,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://securetoken.google.com/paddle-app-1074c
+
+logging:
+  level:
+    org.springframework.security: DEBUG

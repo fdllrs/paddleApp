@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.OffsetDateTime
 import java.util.*
 
 
@@ -82,12 +83,10 @@ class MatchService(
         val startDate = request.startDate
         val endDate = startDate.plusMinutes(request.durationMinutes.toLong())
 
-        if(matchRepository.overlappingMatches(courtId, startDate, endDate).isNotEmpty()) throw IllegalArgumentException(
-            COURT_ALREADY_BOOKED_MESSAGE
-        )
+        assertNoOverlappingMatchesInCourt(courtId, startDate, endDate)
+
 
         val host = findUserById(request.hostId)
-
         val newMatch = Match(
             host = host,
             court = court,
@@ -98,10 +97,10 @@ class MatchService(
             status = MatchStatus.OPEN,
             targetDivision = request.targetDivision
         )
-
         val savedMatch = matchRepository.save(newMatch)
-        val matchId = requireNotNull(savedMatch.id)
 
+
+        val matchId = requireNotNull(savedMatch.id)
         this.joinMatch(matchId, request.hostId)
 
         return savedMatch.toResponseDTO()
@@ -156,6 +155,7 @@ class MatchService(
             numberOfPlayersInMatch(matchId) >= 3
         }
     }
+
     fun isPlayerInMatch(matchId: UUID, playerId: UUID): Boolean {
         return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == playerId }
     }
@@ -187,4 +187,11 @@ class MatchService(
         return userLocationPoint
     }
 
+    private fun assertNoOverlappingMatchesInCourt(courtId: UUID, startDate: OffsetDateTime, endDate: OffsetDateTime) {
+        if (matchRepository.overlappingMatches(courtId, startDate, endDate)
+                .isNotEmpty()
+        ) throw IllegalArgumentException(
+            COURT_ALREADY_BOOKED_MESSAGE
+        )
+    }
 }

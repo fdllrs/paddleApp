@@ -13,7 +13,6 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -29,7 +28,7 @@ class MatchmakingEngine(
 ) {
     private val logger = LoggerFactory.getLogger(MatchmakingEngine::class.java)
 
-    @Scheduled(fixedDelay = 10000)
+//    @Scheduled(fixedDelay = 10000)
     fun processQueue() {
         logger.info("Matchmaking Engine: Sweeping the queue...")
 
