@@ -2,10 +2,12 @@ package com.paddle.app.repository
 
 import com.paddle.app.model.Match
 import com.paddle.app.model.MatchStatus
+import jakarta.persistence.LockModeType
 import org.locationtech.jts.geom.Point
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.OffsetDateTime
@@ -26,7 +28,9 @@ interface MatchRepository: JpaRepository<Match, UUID> {
                           pageable: Pageable
     ): Page<Match>
 
-
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Match m WHERE m.id = :matchId")
+    fun findByIdForUpdate(@Param("matchId") matchId: UUID): Match?
 
     @Query("SELECT m FROM Match m WHERE m.court.id = :courtId AND m.startDate < :newEndTime AND m.endDate > :newStartTime")
     fun overlappingMatches(

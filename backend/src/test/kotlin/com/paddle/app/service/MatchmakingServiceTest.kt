@@ -1,7 +1,6 @@
 package com.paddle.app.service
 
 import com.paddle.app.dto.QueueRequestDTO
-import com.paddle.app.model.Club
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
 import com.paddle.app.model.User
@@ -15,7 +14,8 @@ import io.mockk.impl.annotations.MockK
 import io.mockk.impl.annotations.SpyK
 import io.mockk.junit5.MockKExtension
 import io.mockk.verify
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
@@ -23,7 +23,6 @@ import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.Point
 import java.time.*
 import java.util.*
-import kotlin.test.assertEquals
 
 
 @ExtendWith(MockKExtension::class)
@@ -108,7 +107,8 @@ class MatchmakingServiceTest {
     @Test
     fun `can store a single player in queue`() {
         val myId = UUID.randomUUID()
-        val mockUser = User(displayName = "Nazareno", id = myId, division = 3)
+
+        val mockUser = User(displayName = "Nazareno", id = myId, division = 3, firebaseUid = "1234")
 
         val request = testQueueRequestDTO(
             startTime = fixedDateTime,

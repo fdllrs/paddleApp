@@ -5,16 +5,23 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
 import com.paddle.app.model.MatchStatus
+import com.paddle.app.model.User
+import com.paddle.app.repository.UserRepository
+import com.paddle.app.security.SecurityConfig
 import com.paddle.app.service.MatchService
 import com.paddle.app.service.MatchmakingService
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageImpl
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -25,6 +32,7 @@ import java.math.BigDecimal
 import java.time.*
 import java.util.*
 
+@Import(SecurityConfig::class)
 @WebMvcTest(MatchController::class)
 class MatchControllerTest {
 
@@ -38,6 +46,10 @@ class MatchControllerTest {
     private lateinit var matchService: MatchService
     @MockkBean
     private lateinit var matchmakingService: MatchmakingService
+    @MockkBean
+    private lateinit var userRepository: UserRepository
+
+
 
     private val clock: Clock = Clock.fixed(
         Instant.parse("2026-03-12T10:00:00Z"),
@@ -72,6 +84,17 @@ class MatchControllerTest {
         longitude = -58.3816
     )
 
+    private fun authenticatedUser(
+        id: UUID = UUID.randomUUID(),
+        firebaseUid: String = "test-firebase-uid"
+    ): User =
+        User(
+            id = id,
+            displayName = "Test User",
+            division = 5,
+            firebaseUid = firebaseUid
+        )
+
     @Test
     fun `GET nearby matches returns 200 OK with paginated content`() {
         // --- ARRANGE ---
@@ -80,6 +103,8 @@ class MatchControllerTest {
         val dummyMatchDto = testMatchResponseDTO(dummyMatchId, testMatchRequestDTO())
         // 1. The Wrapper: Simulating Spring Data's pagination metadata
         val pagedResponse = PageImpl(listOf(dummyMatchDto))
+        val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
 
         every {
             matchService.getNearbyOpenMatches(
@@ -102,6 +127,8 @@ class MatchControllerTest {
                 .param("page", "0")
                 .param("size", "20")
                 .contentType(MediaType.APPLICATION_JSON)
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
+
         )
             .andExpect(status().isOk)
 
@@ -110,6 +137,9 @@ class MatchControllerTest {
             .andExpect(jsonPath("$.content[0].id").value(dummyMatchId.toString()))
             .andExpect(jsonPath("$.totalElements").value(1))
             .andExpect(jsonPath("$.totalPages").value(1))
+
+        verify { matchService.getNearbyOpenMatches(any(), any(), any(), any(), any()) }
+
     }
 
     @Test
@@ -117,6 +147,8 @@ class MatchControllerTest {
         // --- ARRANGE ---
         val dummyMatchId = UUID.randomUUID()
         val requestDto = testMatchRequestDTO()
+        val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
 
         val expectedResponse = testMatchResponseDTO(dummyMatchId, requestDto)
 
@@ -128,35 +160,47 @@ class MatchControllerTest {
             post("/api/matches")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(requestDto))
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
+
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").value(dummyMatchId.toString()))
             .andExpect(jsonPath("$.clubName").value(expectedResponse.clubName))
+
+        verify { matchService.createMatch(requestDto) }
+
     }
 
     @Test
-    fun `POST join match routes PathVariable and RequestParam correctly`() {
+    fun `POST join match extracts AuthenticationPrincipal and routes correctly`() {
         // --- ARRANGE ---
         val matchId = UUID.randomUUID()
         val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
 
         every { matchService.joinMatch(matchId, userId) } just Runs
+
 
         // --- ACT & ASSERT ---
         mockMvc.perform(
             post("/api/matches/{matchId}/join", matchId)
-                .param("userId", userId.toString())
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
         )
-            .andExpect(status().isNoContent)
+                .andExpect(status().isNoContent)
+
+        verify { matchService.joinMatch(matchId, userId) }
+
     }
 
     @Test
     fun `GET match players returns flat JSON array of UserResponseDTOs`() {
         // --- ARRANGE ---
+        val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
         val matchId = UUID.randomUUID()
         val dummyUserDto = UserResponseDTO(
-            id = UUID.randomUUID(),
-            displayName = "Facundo",
+            id = userId,
+            displayName = user.displayName,
             division = 5
         )
 
@@ -165,16 +209,21 @@ class MatchControllerTest {
         // --- ACT & ASSERT ---
         mockMvc.perform(
             get("/api/matches/{matchId}/players", matchId)
+            .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$").isArray)
             .andExpect(jsonPath("$[0].displayName").value(dummyUserDto.displayName))
+
+        verify { matchService.getPlayersFromMatch(matchId) }
     }
 
     @Test
     fun `GET player matches returns flat JSON array of MatchResponseDTOs`() {
         // --- ARRANGE ---
         val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
+
         val dummyMatchDto = testMatchResponseDTO(userId, testMatchRequestDTO())
 
         every { matchService.getMatchesForPlayer(userId) } returns listOf(dummyMatchDto)
@@ -182,11 +231,54 @@ class MatchControllerTest {
         // --- ACT & ASSERT ---
         mockMvc.perform(
             get("/api/matches/my-matches")
-                .param("userId", userId.toString())
+            .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$").isArray)
             .andExpect(jsonPath("$[0].clubName").value(dummyMatchDto.clubName))
+
+        verify { matchService.getMatchesForPlayer(userId) }
+
     }
 
+    @Test
+    fun `POST leave match returns 204 with noContent`() {
+        // --- ARRANGE ---
+        val matchId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
+
+        every { matchService.leaveMatch(matchId, userId) } just Runs
+
+
+        // --- ACT & ASSERT ---
+        mockMvc.perform(
+            post("/api/matches/{matchId}/leave", matchId)
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
+        )
+            .andExpect(status().isNoContent)
+
+        verify { matchService.leaveMatch(matchId, userId) }
+    }
+
+    @Test
+    fun `POST cancel match returns 204 with noContent`() {
+        // --- ARRANGE ---
+        val matchId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+        val user = authenticatedUser(id = userId)
+
+        every { matchService.cancelMatch(matchId, userId) } just Runs
+
+
+        // --- ACT & ASSERT ---
+        mockMvc.perform(
+            post("/api/matches/{matchId}/cancel", matchId)
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
+        )
+            .andExpect(status().isNoContent)
+
+        verify { matchService.cancelMatch(matchId, userId) }
+
+    }
 }

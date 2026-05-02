@@ -33,7 +33,10 @@ class MatchService(
     companion object {
         const val MATCH_NOT_FOUND_MESSAGE = "Match not found"
         const val USER_NOT_FOUND_MESSAGE = "User not found"
+        const val MATCH_NOT_OPEN_MESSAGE = "Match not open"
         const val MATCH_FULL_MESSAGE = "Match is full"
+        const val MATCH_PLAYED_MESSAGE = "Match is already played"
+        const val MATCH_CANCELLED_MESSAGE = "Match is cancelled"
         const val COURT_NOT_FOUND_MESSAGE = "Court not found"
         const val USER_ALREADY_IN_MATCH_MESSAGE = "User is already in this match"
         const val HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE = "Host cannot leave the match"
@@ -106,25 +109,33 @@ class MatchService(
         return savedMatch.toResponseDTO()
     }
 
+    @Transactional
     fun joinMatch(matchId: UUID, userId: UUID) {
-        val match = findMatchById(matchId)
+        val match = findMatchByIdForUpdate(matchId)
         val user = findUserById(userId)
 
+
+        assertMatchIsNotPlayed(match)
+        assertMatchIsNotFull(match)
         assertMatchIsOpen(match)
 
-        val reservation = MatchPlayer(match = match, player = user)
 
         // 4. Save to the database
+        val reservation = MatchPlayer(match = match, player = user)
         matchPlayerRepository.save(reservation)
 
-        if (numberOfPlayersInMatch(matchId) == 4) {
+        val currentPlayerCount = numberOfPlayersInMatch(matchId)
+        val newPlayerCount = currentPlayerCount + 1
+        if (newPlayerCount >= 4) {
             match.markAsFull()
             matchRepository.save(match)
         }
+
     }
 
+    @Transactional
     fun leaveMatch(matchId: UUID, userId: UUID) {
-        val match = findMatchById(matchId)
+        val match = findMatchByIdForUpdate(matchId)
         findUserById(userId)
 
         if(match.isHost(userId)) throw IllegalArgumentException(HOST_CANNOT_LEAVE_THE_MATCH_MESSAGE)
@@ -133,15 +144,23 @@ class MatchService(
         throw IllegalArgumentException(USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE)
 
         matchPlayerRepository.delete(matchPlayer)
+
+        if (match.isFull()) {
+            match.markAsOpen()
+            matchRepository.save(match)
+        }
     }
 
+    @Transactional
     fun cancelMatch(matchId: UUID, userId: UUID) {
-        val match = findMatchById(matchId)
+        val match = findMatchByIdForUpdate(matchId)
         findUserById(userId)
 
-        if (!match.isHost(userId)) throw SecurityException(ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE)
+        assertPlayerIsHostOfMatch(match, userId)
 
-        assertMatchIsOpen(match)
+        assertMatchIsNotPlayed(match)
+        assertMatchIsNotCancelled(match)
+
         match.markAsCancelled()
 
         matchRepository.save(match)
@@ -160,6 +179,10 @@ class MatchService(
         return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == playerId }
     }
 
+    private fun assertPlayerIsHostOfMatch(match: Match, userId: UUID) {
+        if (!match.isHost(userId)) throw SecurityException(ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE)
+    }
+
     private fun findUserById(userId: UUID): User {
         return (userRepository.findByIdOrNull(userId)
             ?: throw IllegalArgumentException(USER_NOT_FOUND_MESSAGE))
@@ -170,14 +193,32 @@ class MatchService(
             ?: throw IllegalArgumentException(COURT_NOT_FOUND_MESSAGE))
     }
 
-    private fun assertMatchIsOpen(match: Match) {
-        if (!match.isOpen()) throw IllegalArgumentException(MATCH_FULL_MESSAGE)
+    private fun assertMatchIsNotFull(match: Match) {
+        if (match.isFull()) throw IllegalArgumentException(MATCH_FULL_MESSAGE)
     }
+
+    private fun assertMatchIsOpen(match: Match) {
+        if (!match.isOpen()) throw IllegalArgumentException(MATCH_NOT_OPEN_MESSAGE)
+    }
+
+    private fun assertMatchIsNotPlayed(match: Match) {
+        if (match.isPlayed()) throw IllegalArgumentException(MATCH_PLAYED_MESSAGE)
+    }
+    private fun assertMatchIsNotCancelled(match: Match) {
+        if (match.isCancelled()) throw IllegalArgumentException(MATCH_CANCELLED_MESSAGE)
+    }
+
+
 
     private fun findMatchById(matchId: UUID): Match {
         val match = matchRepository.findByIdOrNull(matchId)
             ?: throw IllegalArgumentException(MATCH_NOT_FOUND_MESSAGE)
         return match
+    }
+
+    private fun findMatchByIdForUpdate(matchId: UUID): Match {
+        return matchRepository.findByIdForUpdate(matchId)
+            ?: throw IllegalArgumentException(MATCH_NOT_FOUND_MESSAGE)
     }
 
     private fun createPointFromCoordinates(longitude: Double, latitude: Double): Point {

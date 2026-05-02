@@ -68,7 +68,8 @@ class MatchServiceTest {
         User(
             id = id,
             displayName = "Test User",
-            division = division
+            division = division,
+            firebaseUid = "1234"
         )
 
     private fun testClub(
@@ -135,7 +136,7 @@ class MatchServiceTest {
     }
 
     private fun givenMatchExists(match: Match) {
-        every { matchRepository.findById(requireNotNull(match.id)) } returns Optional.of(match)
+        every { matchRepository.findByIdForUpdate(requireNotNull(match.id)) } returns match
     }
 
     private fun givenUserMissing(userId: UUID) {
@@ -147,7 +148,7 @@ class MatchServiceTest {
     }
 
     private fun givenMatchMissing(matchId: UUID) {
-        every { matchRepository.findById(matchId) } returns Optional.empty()
+        every { matchRepository.findByIdForUpdate(matchId) } returns null
     }
 
     private fun requestHasNoOverlappingMatches() {
@@ -327,6 +328,45 @@ class MatchServiceTest {
         }
 
         @Test
+        fun `joinMatch marks match as full when fourth player joins`() {
+            // Arrange
+            val player = testUser()
+            val match = testMatch(status = MatchStatus.OPEN)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            val existingPlayers = List(3) {
+                testMatchPlayer(match = match)
+            }
+
+            givenMatchExists(match)
+            givenUserExists(player)
+
+            every { matchPlayerRepository.findByMatchId(matchId) } returns existingPlayers
+            every { matchPlayerRepository.save(any()) } returns mockk()
+            every { matchRepository.save(match) } returns match
+
+            // Act
+            matchService.joinMatch(matchId, playerId)
+
+            // Assert
+            assertTrue { match.isFull() }
+
+            verify(exactly = 1) {
+                matchPlayerRepository.save(
+                    withArg { savedMatchPlayer ->
+                        assertEquals(match.id, savedMatchPlayer.match.id)
+                        assertEquals(player.id, savedMatchPlayer.player.id)
+                    }
+                )
+            }
+
+            verify(exactly = 1) {
+                matchRepository.save(match)
+            }
+        }
+
+        @Test
         fun `joinMatch should throw exception when user is missing`() {
             // Arrange
             val match = testMatch()
@@ -364,22 +404,87 @@ class MatchServiceTest {
         }
 
         @Test
-        fun `joinMatch should throw exception when match is not open`() {
+        fun `Cannot join full match`() {
             // Arrange
             val player = testUser()
-            val closedMatch = testMatch(status = MatchStatus.FULL)
+            val match = testMatch(status = MatchStatus.FULL)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
 
-            givenMatchExists(closedMatch)
+            givenMatchExists(match)
             givenUserExists(player)
 
             // Act
             val exception = assertThrows<IllegalArgumentException> {
-                matchService.joinMatch(requireNotNull(closedMatch.id), requireNotNull(player.id))
+                matchService.joinMatch(matchId, playerId)
             }
 
             // Assert
             assertEquals(MatchService.MATCH_FULL_MESSAGE, exception.message)
-            verify(exactly = 0) { matchPlayerRepository.save(any()) }
+
+            verify(exactly = 0) {
+                matchPlayerRepository.save(any())
+            }
+
+            verify(exactly = 0) {
+                matchRepository.save(any())
+            }
+        }
+
+        @Test
+        fun `Cannot join when match is played`() {
+            // Arrange
+            val player = testUser()
+            val match = testMatch(status = MatchStatus.PLAYED)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            givenMatchExists(match)
+            givenUserExists(player)
+
+            // Act
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.joinMatch(matchId, playerId)
+            }
+
+            // Assert
+            assertEquals(MatchService.MATCH_PLAYED_MESSAGE, exception.message)
+
+            verify(exactly = 0) {
+                matchPlayerRepository.save(any())
+            }
+
+            verify(exactly = 0) {
+                matchRepository.save(any())
+            }
+        }
+
+        @Test
+        fun `Cannot join when match is not open`() {
+            // Arrange
+            val player = testUser()
+            val match = testMatch(status = MatchStatus.CANCELLED)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            givenMatchExists(match)
+            givenUserExists(player)
+
+            // Act
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.joinMatch(matchId, playerId)
+            }
+
+            // Assert
+            assertEquals(MatchService.MATCH_NOT_OPEN_MESSAGE, exception.message)
+
+            verify(exactly = 0) {
+                matchPlayerRepository.save(any())
+            }
+
+            verify(exactly = 0) {
+                matchRepository.save(any())
+            }
         }
 
         @Test
@@ -403,6 +508,7 @@ class MatchServiceTest {
             // Assert
             assertEquals(MatchService.USER_ALREADY_IN_MATCH_MESSAGE, exception.message)
         }
+
     }
 
     @Nested
@@ -505,6 +611,37 @@ class MatchServiceTest {
 
             // Assert
             verify(exactly = 1) { matchPlayerRepository.delete(existingMembership) }
+        }
+
+        @Test
+        fun `Leaving a full match should set the status to open`() {
+            // Arrange
+            val match = testMatch()
+            val playerToLeave = testUser()
+            val playerToLeaveId = requireNotNull(playerToLeave.id)
+            val matchId = requireNotNull(match.id)
+
+            val membershipToDelete = testMatchPlayer(player = playerToLeave, match = match)
+
+            val remainingPlayers = List(3){
+                testMatchPlayer(match = match)
+            }
+            givenMatchExists(match)
+            givenUserExists(playerToLeave)
+
+
+            every { matchPlayerRepository.findByMatchIdAndPlayerId(matchId, playerToLeaveId)} returns membershipToDelete
+            every { matchPlayerRepository.delete(membershipToDelete) } just Runs
+            every { matchPlayerRepository.findByMatchId(matchId) } returns remainingPlayers
+            every { matchRepository.save(match) } returns match
+
+            match.markAsFull()
+
+            // Act
+            matchService.leaveMatch(requireNotNull(match.id), requireNotNull(playerToLeave.id))
+
+            // Assert
+            assertTrue { match.isOpen() }
         }
     }
 

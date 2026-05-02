@@ -1,31 +1,32 @@
 package com.paddle.app.controller
 
+import com.ninjasquad.springmockk.MockkBean
 import com.paddle.app.dto.QueueRequestDTO
+import com.paddle.app.dto.QueueStatusResponseDTO
+import com.paddle.app.model.TicketStatus
+import com.paddle.app.model.User
+import com.paddle.app.repository.UserRepository
+import com.paddle.app.security.SecurityConfig
 import com.paddle.app.service.MatchmakingService
+import io.mockk.Runs
 import io.mockk.every
+import io.mockk.just
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.databind.ObjectMapper
-import java.time.OffsetDateTime
-import java.util.UUID
-import com.ninjasquad.springmockk.MockkBean
-import com.paddle.app.dto.QueueStatusResponseDTO
-import com.paddle.app.model.TicketStatus
-import io.mockk.Runs
-import io.mockk.just
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
+import java.time.*
+import java.util.*
 
+@Import(SecurityConfig::class)
 @WebMvcTest(MatchmakingController::class)
 class MatchmakingControllerTest {
 
@@ -37,6 +38,8 @@ class MatchmakingControllerTest {
 
     @MockkBean
     private lateinit var matchmakingService: MatchmakingService
+    @MockkBean
+    private lateinit var userRepository: UserRepository
 
     private val clock: Clock = Clock.fixed(
         Instant.parse("2026-03-12T10:00:00Z"),
@@ -62,7 +65,8 @@ class MatchmakingControllerTest {
         // --- ARRANGE ---
         val userId = UUID.randomUUID()
         val expectedTicketId = UUID.randomUUID()
-
+        val testFirebaseId = "1234"
+        val user = User(id = userId, displayName = "Facundo", division = 5, firebaseUid = testFirebaseId)
         val requestDto = testQueueRequestDTO()
 
         every { matchmakingService.joinQueue(requestDto, userId) } returns expectedTicketId
@@ -73,6 +77,7 @@ class MatchmakingControllerTest {
                 .param("userId", userId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(requestDto)) // Converts DTO to JSON
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
         )
             .andExpect(status().isAccepted) // Asserts HTTP 202
             .andExpect(content().string(objectMapper.writeValueAsString(expectedTicketId))) // Asserts the body contains the UUID
@@ -88,6 +93,8 @@ class MatchmakingControllerTest {
             status = TicketStatus.SEARCHING,
             matchId = null
         )
+        val testFirebaseId = "1234"
+        val user = User(id = userId, displayName = "Facundo", division = 5, firebaseUid = testFirebaseId)
 
         every { matchmakingService.getTicketStatusForUser(userId) } returns expectedTicketStatus
 
@@ -95,6 +102,7 @@ class MatchmakingControllerTest {
         mockMvc.perform(
             get("/api/matchmaking/queue/status")
                 .param("userId", userId.toString())
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
         )
             .andExpect(status().isOk)
             .andExpect(content().string(objectMapper.writeValueAsString(expectedTicketStatus)))
@@ -105,6 +113,8 @@ class MatchmakingControllerTest {
     fun `DELETE queue returns NoContent`(){
         // --- ARRANGE ---
         val userId = UUID.randomUUID()
+        val testFirebaseId = "1234"
+        val user = User(id = userId, displayName = "Facundo", division = 5, firebaseUid = testFirebaseId)
 
         every { matchmakingService.leaveQueue(userId, TicketStatus.CANCELLED) } just Runs
 
@@ -112,6 +122,7 @@ class MatchmakingControllerTest {
         mockMvc.perform(
             delete("/api/matchmaking/queue")
                 .param("userId", userId.toString())
+                .with(authentication(UsernamePasswordAuthenticationToken(user, user.firebaseUid, emptyList())))
         )
             .andExpect(status().isNoContent)
 

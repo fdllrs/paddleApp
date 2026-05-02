@@ -4,6 +4,7 @@ import com.paddle.app.service.MatchService
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -25,4 +26,8 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleInvalidOnboard(ex: MethodArgumentNotValidException): ResponseEntity<Map<String, String?>> {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
+    }
 }
