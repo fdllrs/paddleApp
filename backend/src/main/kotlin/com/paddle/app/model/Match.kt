@@ -49,6 +49,12 @@ class Match (
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: OffsetDateTime? = null
 ) {
+
+    companion object {
+        const val MAX_PLAYERS = 4
+        const val MIN_PLAYERS_TO_START = 4
+    }
+
     private fun markAs(status: MatchStatus) {
         this.status = status
     }
@@ -62,6 +68,24 @@ class Match (
     fun markAsFull() = markAs(MatchStatus.FULL)
     fun markAsPlayed() = markAs(MatchStatus.PLAYED)
     fun markAsOpen() = markAs(MatchStatus.OPEN)
+
+    fun canAcceptPlayers(playerCount: Int): Boolean {
+        return isOpen() && playerCount < MAX_PLAYERS
+    }
+
+    fun hasEnoughPlayersToStart(playerCount: Int): Boolean {
+        return playerCount >= MIN_PLAYERS_TO_START
+    }
+
+    fun refreshCapacityStatus(playerCount: Int) {
+        if (isCancelled() || isPlayed()) return
+
+        if (playerCount >= MAX_PLAYERS) {
+            markAsFull()
+        } else {
+            markAsOpen()
+        }
+    }
 
     fun isHost(userId: UUID) = this.host.id == userId
 

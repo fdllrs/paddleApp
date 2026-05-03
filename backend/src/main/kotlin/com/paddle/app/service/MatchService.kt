@@ -67,9 +67,7 @@ class MatchService(
     }
 
     fun numberOfPlayersInMatch(matchId: UUID): Int {
-        val matchPlayers = matchPlayerRepository.findByMatchId(matchId)
-        return matchPlayers.count()
-
+        return matchPlayerRepository.countByMatchId(matchId)
     }
 
     @Transactional(readOnly = true)
