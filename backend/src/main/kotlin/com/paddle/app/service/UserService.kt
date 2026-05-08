@@ -7,6 +7,7 @@ import com.paddle.app.model.User
 import com.paddle.app.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.*
 
 @Service
 class UserService (
@@ -17,7 +18,7 @@ class UserService (
         const val USER_ALREADY_EXISTS_MESSAGE = "User already exists"
     }
 
-    fun getUser(firebaseUid: String): UserResponseDTO? {
+    fun getUserByFirebaseUid(firebaseUid: String): UserResponseDTO? {
         val user = userRepository.findUserByFirebaseUid(firebaseUid) ?: return null
 
         return user.toResponseDTO()
@@ -37,13 +38,12 @@ class UserService (
         userRepository.save(user)
     }
 
-
-
-
-
+    fun getUserById(userId: UUID): User {
+        return userRepository.findUserById(userId) ?: throw IllegalArgumentException(USER_ALREADY_EXISTS_MESSAGE)
+    }
 
     private fun assertUserNotAlreadyOnboarded(firebaseUid: String) {
-        if (this.getUser(firebaseUid) != null) throw IllegalStateException(USER_ALREADY_EXISTS_MESSAGE)
+        if (getUserByFirebaseUid(firebaseUid) != null) throw IllegalStateException(USER_ALREADY_EXISTS_MESSAGE)
     }
 
 }

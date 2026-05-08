@@ -99,7 +99,7 @@ class UserControllerTest {
     fun `GET user returns 200 OK`() {
         val user = testUser()
 
-        every { userService.getUser(user.firebaseUid)} returns user.toResponseDTO()
+        every { userService.getUserByFirebaseUid(user.firebaseUid)} returns user.toResponseDTO()
 
         mockMvc.perform(
             get("/api/users/me")
@@ -121,7 +121,7 @@ class UserControllerTest {
     fun `GET user returns NOT FOUND if user is not found`() {
         val firebaseUid = "firebase-uid-123"
 
-        every { userService.getUser(any())} returns null
+        every { userService.getUserByFirebaseUid(any())} returns null
 
         mockMvc.perform(
             get("/api/users/me")

@@ -18,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import java.time.OffsetDateTime
@@ -190,12 +189,8 @@ class MatchServiceTest {
 
 
             every { matchRepository.save(any()) } returns match
-            every { matchPlayerRepository.findByMatchId(match.id!!) } returns listOf(
-                testMatchPlayer(
-                    player = host,
-                    match = match
-                )
-            )
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 0
             every { matchPlayerRepository.save(any()) } returns mockk()
             // Act
             val response = matchService.createMatch(request)
@@ -308,13 +303,19 @@ class MatchServiceTest {
             val court = testCourt()
             val match = testMatch(host = host, court = court)
 
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
             givenUserExists(player)
             givenMatchExists(match)
             every { matchPlayerRepository.save(any()) } returns mockk()
-            every { matchPlayerRepository.findByMatchId(match.id!!) } returns listOf(testMatchPlayer(player = host, match = match))
+            every { matchPlayerRepository.findByMatchId(matchId) } returns listOf(testMatchPlayer(player = host, match = match))
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 2
+
+            every { matchRepository.save(any()) } returns match
 
             // Act
-            matchService.joinMatch(requireNotNull(match.id), requireNotNull(player.id))
+            matchService.joinMatch(matchId, playerId)
 
             // Assert
             verify(exactly = 1) {
@@ -343,6 +344,7 @@ class MatchServiceTest {
             givenUserExists(player)
 
             every { matchPlayerRepository.findByMatchId(matchId) } returns existingPlayers
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 4
             every { matchPlayerRepository.save(any()) } returns mockk()
             every { matchRepository.save(match) } returns match
 
@@ -414,6 +416,8 @@ class MatchServiceTest {
             givenMatchExists(match)
             givenUserExists(player)
 
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
+
             // Act
             val exception = assertThrows<IllegalArgumentException> {
                 matchService.joinMatch(matchId, playerId)
@@ -441,6 +445,7 @@ class MatchServiceTest {
 
             givenMatchExists(match)
             givenUserExists(player)
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
 
             // Act
             val exception = assertThrows<IllegalArgumentException> {
@@ -469,6 +474,7 @@ class MatchServiceTest {
 
             givenMatchExists(match)
             givenUserExists(player)
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
 
             // Act
             val exception = assertThrows<IllegalArgumentException> {
@@ -493,16 +499,19 @@ class MatchServiceTest {
             val player = testUser()
             val host = testUser()
             val match = testMatch(host = host)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
 
             givenMatchExists(match)
             givenUserExists(player)
+
             every {
-                matchPlayerRepository.save(any())
-            } throws DataIntegrityViolationException(MatchService.USER_ALREADY_IN_MATCH_MESSAGE)
+                matchPlayerRepository.findByMatchId(matchId)
+            } returns listOf(testMatchPlayer(player = player, match = match))
 
             // Act
-            val exception = assertThrows<DataIntegrityViolationException> {
-                matchService.joinMatch(requireNotNull(match.id), requireNotNull(player.id))
+            val exception = assertThrows<IllegalArgumentException> {
+                matchService.joinMatch(matchId, playerId)
             }
 
             // Assert
@@ -598,13 +607,18 @@ class MatchServiceTest {
             val match = testMatch()
             val player = testUser()
             val existingMembership = testMatchPlayer(player = player, match = match)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
 
             givenMatchExists(match)
             givenUserExists(player)
             every {
-                matchPlayerRepository.findByMatchIdAndPlayerId(requireNotNull(match.id), requireNotNull(player.id))
+                matchPlayerRepository.findByMatchIdAndPlayerId(matchId, playerId)
             } returns existingMembership
             every { matchPlayerRepository.delete(any()) } just Runs
+            every { matchRepository.save(any()) } returns match
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 2
+
 
             // Act
             matchService.leaveMatch(requireNotNull(match.id), requireNotNull(player.id))
@@ -623,16 +637,15 @@ class MatchServiceTest {
 
             val membershipToDelete = testMatchPlayer(player = playerToLeave, match = match)
 
-            val remainingPlayers = List(3){
-                testMatchPlayer(match = match)
-            }
+
             givenMatchExists(match)
             givenUserExists(playerToLeave)
 
 
             every { matchPlayerRepository.findByMatchIdAndPlayerId(matchId, playerToLeaveId)} returns membershipToDelete
             every { matchPlayerRepository.delete(membershipToDelete) } just Runs
-            every { matchPlayerRepository.findByMatchId(matchId) } returns remainingPlayers
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 4
+
             every { matchRepository.save(match) } returns match
 
             match.markAsFull()

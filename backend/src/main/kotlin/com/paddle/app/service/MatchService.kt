@@ -44,7 +44,7 @@ class MatchService(
         const val ONLY_THE_HOST_CAN_CANCEL_THE_MATCH_MESSAGE = "Only the host can cancel the match"
         const val COURT_ALREADY_BOOKED_MESSAGE = "Court is already booked for this time window"
 
-
+        const val MAX_PLAYERS_PER_MATCH = 4
     }
 
     fun getNearbyOpenMatches(
@@ -98,11 +98,10 @@ class MatchService(
             status = MatchStatus.OPEN,
             targetDivision = request.targetDivision
         )
+
         val savedMatch = matchRepository.save(newMatch)
+        registerPlayerForMatch(savedMatch, host)
 
-
-        val matchId = requireNotNull(savedMatch.id)
-        this.joinMatch(matchId, request.hostId)
 
         return savedMatch.toResponseDTO()
     }
@@ -112,6 +111,7 @@ class MatchService(
         val match = findMatchByIdForUpdate(matchId)
         val user = findUserById(userId)
 
+        assertUserNotInMatch(match.id!!, user.id!!)
 
         assertMatchIsNotPlayed(match)
         assertMatchIsNotFull(match)
@@ -119,17 +119,14 @@ class MatchService(
 
 
         // 4. Save to the database
-        val reservation = MatchPlayer(match = match, player = user)
-        matchPlayerRepository.save(reservation)
+        registerPlayerForMatch(match, user)
 
-        val currentPlayerCount = numberOfPlayersInMatch(matchId)
-        val newPlayerCount = currentPlayerCount + 1
-        if (newPlayerCount >= 4) {
-            match.markAsFull()
-            matchRepository.save(match)
-        }
+        refreshMatchCapacityStatus(match, matchPlayerRepository.countByMatchId(matchId))
+        matchRepository.save(match)
 
     }
+
+
 
     @Transactional
     fun leaveMatch(matchId: UUID, userId: UUID) {
@@ -141,12 +138,10 @@ class MatchService(
         val matchPlayer = matchPlayerRepository.findByMatchIdAndPlayerId(matchId, userId) ?:
         throw IllegalArgumentException(USER_IS_NOT_A_PLAYER_IN_THIS_MATCH_MESSAGE)
 
+        refreshMatchCapacityStatus(match, matchPlayerRepository.countByMatchId(matchId) - 1)
+        matchRepository.save(match)
         matchPlayerRepository.delete(matchPlayer)
 
-        if (match.isFull()) {
-            match.markAsOpen()
-            matchRepository.save(match)
-        }
     }
 
     @Transactional
@@ -173,8 +168,8 @@ class MatchService(
         }
     }
 
-    fun isPlayerInMatch(matchId: UUID, playerId: UUID): Boolean {
-        return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == playerId }
+    fun isUserInMatch(matchId: UUID, userId: UUID): Boolean {
+        return matchPlayerRepository.findByMatchId(matchId).any { it.player.id == userId }
     }
 
     private fun assertPlayerIsHostOfMatch(match: Match, userId: UUID) {
@@ -206,6 +201,9 @@ class MatchService(
         if (match.isCancelled()) throw IllegalArgumentException(MATCH_CANCELLED_MESSAGE)
     }
 
+    private fun assertUserNotInMatch(matchId: UUID, userId: UUID) {
+        if (this.isUserInMatch(matchId, userId)) throw IllegalArgumentException(USER_ALREADY_IN_MATCH_MESSAGE)
+    }
 
 
     private fun findMatchById(matchId: UUID): Match {
@@ -232,5 +230,20 @@ class MatchService(
         ) throw IllegalArgumentException(
             COURT_ALREADY_BOOKED_MESSAGE
         )
+    }
+
+    private fun refreshMatchCapacityStatus(match: Match, playerCount: Int) {
+        if (match.isCancelled() || match.isPlayed()) return
+
+        if (playerCount >= MAX_PLAYERS_PER_MATCH) {
+            match.markAsFull()
+        } else {
+            match.markAsOpen()
+        }
+    }
+
+    private fun registerPlayerForMatch(match: Match, user: User) {
+        val reservation = MatchPlayer(match = match, player = user)
+        matchPlayerRepository.save(reservation)
     }
 }

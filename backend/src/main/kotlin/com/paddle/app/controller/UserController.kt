@@ -17,7 +17,7 @@ class UserController(private val userService: UserService) {
 
     @GetMapping("/me")
     fun getMe(@AuthenticationPrincipal jwt: Jwt): ResponseEntity<UserResponseDTO> {
-        val user = userService.getUser(jwt.subject) ?: return ResponseEntity.notFound().build()
+        val user = userService.getUserByFirebaseUid(jwt.subject) ?: return ResponseEntity.notFound().build()
 
         return ResponseEntity.status(HttpStatus.OK).body(user)
     }
