@@ -89,7 +89,9 @@ class MatchmakingTicket (
 }
 enum class TicketStatus {
     SEARCHING,
+    PROCESSING,
     MATCHED,
     EXPIRED,
-    CANCELLED
+    CANCELLED,
+    FAILED
 }

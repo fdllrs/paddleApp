@@ -30,7 +30,7 @@ class MatchmakingController(private val matchmakingService: MatchmakingService) 
 
     @DeleteMapping("/queue")
     fun leaveQueue(@AuthenticationPrincipal user: User): ResponseEntity<Void>{
-        matchmakingService.leaveQueue(user.id!!, TicketStatus.CANCELLED)
+        matchmakingService.leaveQueueWithStatus(user.id!!, TicketStatus.CANCELLED)
         return ResponseEntity.noContent().build()
     }
 }

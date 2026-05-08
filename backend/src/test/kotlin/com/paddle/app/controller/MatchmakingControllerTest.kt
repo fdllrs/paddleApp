@@ -116,7 +116,7 @@ class MatchmakingControllerTest {
         val testFirebaseId = "1234"
         val user = User(id = userId, displayName = "Facundo", division = 5, firebaseUid = testFirebaseId)
 
-        every { matchmakingService.leaveQueue(userId, TicketStatus.CANCELLED) } just Runs
+        every { matchmakingService.leaveQueueWithStatus(userId, TicketStatus.CANCELLED) } just Runs
 
         // --- ACT & ASSERT ---
         mockMvc.perform(

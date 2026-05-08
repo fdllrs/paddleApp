@@ -99,7 +99,7 @@ class MatchmakingServiceTest {
             endTime = fixedDateTime,
         )
 
-        val result = matchmakingService.isValidRequest(request)
+        val result = matchmakingService.isValidRequestTimeRange(request)
 
         assertFalse(result)
     }

@@ -82,7 +82,7 @@ class MatchmakingEngine(
 
     private fun createFallbackMatch(ticket: MatchmakingTicket, userId: UUID) {
         val matchResponseDTO = createDTOFromPreference(ticket)
-        matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
+        matchmakingService.leaveQueueWithStatus(userId, TicketStatus.MATCHED)
 
         if (!ticket.isSoloQ()) {
             matchService.joinMatch(matchResponseDTO.id!!, ticket.partnerId!!)
@@ -116,7 +116,7 @@ class MatchmakingEngine(
             val matchId = requireNotNull(match.id)
             try {
                 matchService.joinMatch(matchId, userId)
-                matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
+                matchmakingService.leaveQueueWithStatus(userId, TicketStatus.MATCHED)
                 logger.info("Matchmaking Engine: User $userId joined match $matchId")
 
                 return true
@@ -151,7 +151,7 @@ class MatchmakingEngine(
                 continue
             }
 
-            matchmakingService.leaveQueue(userId, TicketStatus.MATCHED)
+            matchmakingService.leaveQueueWithStatus(userId, TicketStatus.MATCHED)
             logger.info("Matchmaking Engine: Duo ($userId, $partnerId) joined match $matchId")
 
             return true
@@ -175,7 +175,7 @@ class MatchmakingEngine(
     }
 
     private fun handleExpiredTicket(ticket: MatchmakingTicket) {
-        matchmakingService.leaveQueue(ticket.userId, TicketStatus.EXPIRED)
+        matchmakingService.leaveQueueWithStatus(ticket.userId, TicketStatus.EXPIRED)
         logger.info("Matchmaking Engine: Ticket ${ticket.id} expired (less than 30m remaining or past endTime)")
     }
 }

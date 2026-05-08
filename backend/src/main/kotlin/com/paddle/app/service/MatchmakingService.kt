@@ -3,43 +3,44 @@ package com.paddle.app.service
 import com.paddle.app.dto.QueueRequestDTO
 import com.paddle.app.dto.QueueStatusResponseDTO
 import com.paddle.app.dto.toQueueStatusResponseDTO
-import com.paddle.app.model.Club
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
 import com.paddle.app.repository.ClubRepository
-import com.paddle.app.repository.UserRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
-import java.util.UUID
-import org.springframework.stereotype.Service
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
-import org.locationtech.jts.geom.Point
+import org.springframework.stereotype.Service
+import java.util.*
+
+
 
 @Service
 class MatchmakingService(
-    private val userRepository: UserRepository,
     private val matchmakingTicketRepository: MatchmakingTicketRepository,
     private val geometryFactory: GeometryFactory,
     private val clubRepository: ClubRepository,
     private val matchService: MatchService,
+    private val userService: UserService,
 ) {
+
     companion object {
-        const val STATUS_SEARCHING = "SEARCHING"
-        const val STATUS_CANCELLED = "CANCELLED"
-        const val STATUS_EXPIRED = "EXPIRED"
-        const val STATUS_MATCHED = "MATCHED"
+
+        const val USER_NOT_IN_QUEUE_MESSAGE = "User is not in the matchmaking queue"
+        const val USER_ALREADY_IN_QUEUE_MESSAGE = "User is already in the matchmaking queue"
+        const val INVALID_TIME_RANGE_MESSAGE = "The provided queue request is not valid: End time must be after start time."
+
     }
 
-    fun isValidRequest(request: QueueRequestDTO): Boolean {
+
+    fun isValidRequestTimeRange(request: QueueRequestDTO): Boolean {
         return request.endTime.isAfter(request.startTime)
     }
 
     fun joinQueue(request: QueueRequestDTO, userId: UUID): UUID {
 
         assertQueueJoiningIsValid(userId, request)
+        val user = userService.getUserById(userId)
 
-        val user = userRepository.findUserById(userId)
-            ?: throw IllegalArgumentException("User not found")
 
         val searchLocation = geometryFactory.createPoint(
             Coordinate(request.longitude, request.latitude)
@@ -62,17 +63,20 @@ class MatchmakingService(
 
         val savedTicket = matchmakingTicketRepository.save(newMatchmakingTicket)
 
-        return savedTicket.id!!
+        return requireNotNull(savedTicket.id)
     }
 
-    fun leaveQueue(userId: UUID, status: TicketStatus) {
-        val ticket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING) ?:
-        throw IllegalArgumentException("User is not in the matchmaking queue")
+    fun leaveQueueWithStatus(userId: UUID, status: TicketStatus) {
+        val ticket = findSearchingTicketForUser(userId)
 
         ticket.status = status
 
         matchmakingTicketRepository.save(ticket)
     }
+
+    private fun findSearchingTicketForUser(userId: UUID): MatchmakingTicket =
+        matchmakingTicketRepository.findByUserIdAndStatus(userId, TicketStatus.SEARCHING)
+            ?: throw IllegalArgumentException(USER_NOT_IN_QUEUE_MESSAGE)
 
     fun isPlayerInQueue(playerID: UUID): Boolean {
         return matchmakingTicketRepository.existsByUserId(playerID)
@@ -80,7 +84,7 @@ class MatchmakingService(
 
     fun getTicketStatusForUser(playerID: UUID): QueueStatusResponseDTO {
         val ticket = matchmakingTicketRepository.findByUserId(playerID) ?:
-        throw IllegalArgumentException("User is not in the matchmaking queue")
+        throw IllegalArgumentException(USER_NOT_IN_QUEUE_MESSAGE)
 
         return ticket.toQueueStatusResponseDTO()
     }
@@ -93,13 +97,13 @@ class MatchmakingService(
 
 
     private fun assertQueueJoiningIsValid(userId: UUID, request: QueueRequestDTO) {
-        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, STATUS_SEARCHING)
+        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, TicketStatus.SEARCHING)
         if (existingTicket != null) {
-            throw IllegalStateException("User is already in the matchmaking queue")
+            throw IllegalStateException(USER_ALREADY_IN_QUEUE_MESSAGE)
         }
 
-        if (!isValidRequest(request)) {
-            throw IllegalArgumentException("The provided queue request is not valid: End time must be after start time.")
+        if (!isValidRequestTimeRange(request)) {
+            throw IllegalArgumentException(INVALID_TIME_RANGE_MESSAGE)
         }
     }
 }

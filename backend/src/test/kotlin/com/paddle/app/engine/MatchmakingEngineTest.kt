@@ -83,13 +83,13 @@ class MatchmakingEngineTest {
         } returns pagedResponse
 
         every { matchService.joinMatch(matchId, userId) } just Runs
-        every { matchmakingService.leaveQueue(userId, any()) } just Runs
+        every { matchmakingService.leaveQueueWithStatus(userId, any()) } just Runs
 
         matchmakingEngine.processQueue()
 
         // Assert
         verify(exactly = 1) { matchService.joinMatch(matchId, userId) }
-        verify(exactly = 1) { matchmakingService.leaveQueue(userId, TicketStatus.MATCHED) }
+        verify(exactly = 1) { matchmakingService.leaveQueueWithStatus(userId, TicketStatus.MATCHED) }
     }
 
     @Test
@@ -111,13 +111,13 @@ class MatchmakingEngineTest {
         )
 
         every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(expiredTicket)
-        every { matchmakingService.leaveQueue(expiredTicket.userId, TicketStatus.EXPIRED) } just Runs
+        every { matchmakingService.leaveQueueWithStatus(expiredTicket.userId, TicketStatus.EXPIRED) } just Runs
 
         matchmakingEngine.processQueue()
 
         // Assert
         verify(exactly = 1) {
-            matchmakingService.leaveQueue(expiredTicket.userId, TicketStatus.EXPIRED)
+            matchmakingService.leaveQueueWithStatus(expiredTicket.userId, TicketStatus.EXPIRED)
         }
 
         verify(exactly = 0) {
@@ -158,7 +158,7 @@ class MatchmakingEngineTest {
         every { matchService.joinMatch(matchId1, userId) } throws IllegalStateException("Match full")
         // match2 succeeds
         every { matchService.joinMatch(matchId2, userId) } just Runs
-        every { matchmakingService.leaveQueue(userId, TicketStatus.MATCHED) } just Runs
+        every { matchmakingService.leaveQueueWithStatus(userId, TicketStatus.MATCHED) } just Runs
 
         // Act
         matchmakingEngine.processQueue()
@@ -166,6 +166,6 @@ class MatchmakingEngineTest {
         // Assert
         verify(exactly = 1) { matchService.joinMatch(matchId1, userId) }
         verify(exactly = 1) { matchService.joinMatch(matchId2, userId) }
-        verify(exactly = 1) { matchmakingService.leaveQueue(userId, TicketStatus.MATCHED) }
+        verify(exactly = 1) { matchmakingService.leaveQueueWithStatus(userId, TicketStatus.MATCHED) }
     }
 }
