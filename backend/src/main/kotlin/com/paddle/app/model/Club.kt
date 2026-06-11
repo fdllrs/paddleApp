@@ -38,6 +38,10 @@ class Club (
     @OneToMany(mappedBy = "club", cascade = [CascadeType.ALL], orphanRemoval = true)
     var courts: MutableList<Court> = mutableListOf(),
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    var manager: User? = null,
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: OffsetDateTime? = null

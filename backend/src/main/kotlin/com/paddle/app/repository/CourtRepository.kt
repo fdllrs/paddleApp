@@ -11,4 +11,6 @@ interface CourtRepository: JpaRepository<Court, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     fun findCourtById(id: UUID): Court?
+
+    fun findByClubId(clubId: UUID): List<Court>
 }

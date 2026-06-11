@@ -16,6 +16,7 @@ class UserService (
 
     companion object {
         const val USER_ALREADY_EXISTS_MESSAGE = "User already exists"
+        const val USER_NOT_FOUND_MESSAGE = "User not found"
     }
 
     fun getUserByFirebaseUid(firebaseUid: String): UserResponseDTO? {
@@ -39,7 +40,7 @@ class UserService (
     }
 
     fun getUserById(userId: UUID): User {
-        return userRepository.findUserById(userId) ?: throw IllegalArgumentException(USER_ALREADY_EXISTS_MESSAGE)
+        return userRepository.findUserById(userId) ?: throw IllegalArgumentException(USER_NOT_FOUND_MESSAGE)
     }
 
     private fun assertUserNotAlreadyOnboarded(firebaseUid: String) {
