@@ -12,11 +12,14 @@ import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
 import io.mockk.impl.annotations.SpyK
 import io.mockk.junit5.MockKExtension
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.springframework.data.domain.PageImpl
+import org.springframework.transaction.support.TransactionCallback
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.*
 import java.util.*
 
@@ -34,15 +37,25 @@ class MatchmakingEngineTest {
     private lateinit var courtRepository: CourtRepository
     @SpyK
     private var geometryFactory = GeometryFactory()
+    @MockK
+    private lateinit var transactionTemplate: TransactionTemplate
+    @MockK
+    private lateinit var clock: Clock
 
-    private val clock: Clock = Clock.fixed(
-        Instant.parse("2026-03-12T10:00:00Z"),
-        ZoneId.of("UTC")
-    )
-    private val fixedDateTime: OffsetDateTime = clock.instant().atOffset(ZoneOffset.UTC)
+    private val fixedDateTime: OffsetDateTime = Instant.parse("2026-03-12T10:00:00Z").atOffset(ZoneOffset.UTC)
 
     @InjectMockKs
     private lateinit var matchmakingEngine: MatchmakingEngine
+
+    @BeforeEach
+    fun setUp() {
+        every { clock.instant() } returns Instant.parse("2026-03-12T10:00:00Z")
+        every { clock.zone } returns ZoneId.of("UTC")
+        every { transactionTemplate.execute(any<TransactionCallback<Any>>()) } answers {
+            val callback = firstArg<TransactionCallback<Any>>()
+            callback.doInTransaction(mockk(relaxed = true))
+        }
+    }
 
     @Test
     fun `queueing player joins a compatible match and ticket is updated`() {
@@ -70,7 +83,8 @@ class MatchmakingEngineTest {
         }
         val pagedResponse = PageImpl(listOf(mockMatchDTO))
 
-        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(ticket)
+        every { matchmakingTicketRepository.findNextTicketsForProcessing(TicketStatus.SEARCHING, any()) } returns listOf(ticket)
+        every { matchmakingTicketRepository.saveAll(any<List<MatchmakingTicket>>()) } returns listOf(ticket)
 
         every {
             matchService.getNearbyOpenMatches(
@@ -110,7 +124,8 @@ class MatchmakingEngineTest {
             preferredDurationMinutes = 90
         )
 
-        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(expiredTicket)
+        every { matchmakingTicketRepository.findNextTicketsForProcessing(TicketStatus.SEARCHING, any()) } returns listOf(expiredTicket)
+        every { matchmakingTicketRepository.saveAll(any<List<MatchmakingTicket>>()) } returns listOf(expiredTicket)
         every { matchmakingService.leaveQueueWithStatus(expiredTicket.userId, TicketStatus.EXPIRED) } just Runs
 
         matchmakingEngine.processQueue()
@@ -150,7 +165,8 @@ class MatchmakingEngineTest {
 
         val pagedResponse = PageImpl(listOf(match1, match2))
 
-        every { matchmakingTicketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING) } returns listOf(ticket)
+        every { matchmakingTicketRepository.findNextTicketsForProcessing(TicketStatus.SEARCHING, any()) } returns listOf(ticket)
+        every { matchmakingTicketRepository.saveAll(any<List<MatchmakingTicket>>()) } returns listOf(ticket)
         // Engine finds 2 nearby matches
         every { matchService.getNearbyOpenMatches(any(), any(), any(), any(), any()) } returns pagedResponse
 

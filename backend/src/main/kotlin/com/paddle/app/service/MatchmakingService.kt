@@ -5,7 +5,6 @@ import com.paddle.app.dto.QueueStatusResponseDTO
 import com.paddle.app.dto.toQueueStatusResponseDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
-import com.paddle.app.repository.ClubRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -13,13 +12,10 @@ import org.springframework.stereotype.Service
 import java.util.*
 
 
-
 @Service
 class MatchmakingService(
     private val matchmakingTicketRepository: MatchmakingTicketRepository,
     private val geometryFactory: GeometryFactory,
-    private val clubRepository: ClubRepository,
-    private val matchService: MatchService,
     private val userService: UserService,
 ) {
 
@@ -74,10 +70,12 @@ class MatchmakingService(
         matchmakingTicketRepository.save(ticket)
     }
 
-    private fun findSearchingTicketForUser(userId: UUID): MatchmakingTicket =
-        matchmakingTicketRepository.findByUserIdAndStatus(userId, TicketStatus.SEARCHING)
-            ?: throw IllegalArgumentException(USER_NOT_IN_QUEUE_MESSAGE)
-
+    private fun findSearchingTicketForUser(userId: UUID): MatchmakingTicket {
+        return matchmakingTicketRepository.findByUserIdAndStatusIn(
+            userId,
+            listOf(TicketStatus.SEARCHING, TicketStatus.PROCESSING)) ?:
+            throw IllegalArgumentException(USER_NOT_IN_QUEUE_MESSAGE)
+    }
     fun isPlayerInQueue(playerID: UUID): Boolean {
         return matchmakingTicketRepository.existsByUserId(playerID)
     }
@@ -97,7 +95,10 @@ class MatchmakingService(
 
 
     private fun assertQueueJoiningIsValid(userId: UUID, request: QueueRequestDTO) {
-        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatus(userId, TicketStatus.SEARCHING)
+        val existingTicket = matchmakingTicketRepository.findByUserIdAndStatusIn(
+            userId,
+            listOf(TicketStatus.SEARCHING, TicketStatus.PROCESSING)
+        )
         if (existingTicket != null) {
             throw IllegalStateException(USER_ALREADY_IN_QUEUE_MESSAGE)
         }

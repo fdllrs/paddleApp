@@ -4,10 +4,7 @@ import com.paddle.app.dto.QueueRequestDTO
 import com.paddle.app.model.MatchmakingTicket
 import com.paddle.app.model.TicketStatus
 import com.paddle.app.model.User
-import com.paddle.app.repository.ClubRepository
-import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchmakingTicketRepository
-import com.paddle.app.repository.UserRepository
 import io.mockk.every
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
@@ -29,19 +26,10 @@ import java.util.*
 class MatchmakingServiceTest {
 
     @MockK
-    private lateinit var userRepository: UserRepository
+    private lateinit var userService: UserService
 
     @MockK
     private lateinit var matchmakingTicketRepository: MatchmakingTicketRepository
-
-    @MockK
-    private lateinit var clubRepository: ClubRepository
-
-    @MockK
-    private lateinit var courtRepository: CourtRepository
-
-    @MockK
-    private lateinit var matchService: MatchService
 
     @SpyK
     private var geometryFactory = GeometryFactory()
@@ -122,8 +110,8 @@ class MatchmakingServiceTest {
         val newMatchmakingTicket = testTicket(myId, mockUser, searchLocation, request)
 
 
-        every { userRepository.findUserById(myId) } returns mockUser
-        every { matchmakingTicketRepository.findByUserIdAndStatus(any(), any())} returns null
+        every { userService.getUserById(myId) } returns mockUser
+        every { matchmakingTicketRepository.findByUserIdAndStatusIn(eq(myId), any()) } returns null
         every { matchmakingTicketRepository.save(any()) } answers { newMatchmakingTicket }
         every { matchmakingTicketRepository.count() } returns 1L
         every { matchmakingTicketRepository.existsByUserId(myId) } returns true

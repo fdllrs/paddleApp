@@ -13,7 +13,9 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.util.*
@@ -24,42 +26,113 @@ class MatchmakingEngine(
     private val matchService: MatchService,
     private val matchmakingService: MatchmakingService,
     private val courtRepository: CourtRepository,
-    private val clock: Clock
+    private val clock: Clock,
+    private val transactionTemplate: TransactionTemplate
+
 ) {
+    private enum class ProcessingOutcome {
+        MATCHED,
+        EXPIRED,
+        FAILED
+    }
+
     private val logger = LoggerFactory.getLogger(MatchmakingEngine::class.java)
 
-//    @Scheduled(fixedDelay = 10000)
+    @Scheduled(fixedDelayString = $$"${app.matchmaking.fixed-delay-ms:10000}")
     fun processQueue() {
-        logger.info("Matchmaking Engine: Sweeping the queue...")
+        val cycleStartedAt = OffsetDateTime.now(clock)
 
-        try {
-            val openTickets = ticketRepository.findByStatusOrderByCreatedAtAsc(TicketStatus.SEARCHING)
+        logger.info("Matchmaking Engine: starting queue processing cycle at {}", cycleStartedAt)
 
-            logger.info("Matchmaking Engine: found ${openTickets.size} open tickets")
+        val claimedTickets = claimNextTickets()
 
-            for (ticket in openTickets) {
-                if (ticket.isExpired(OffsetDateTime.now(clock))) { handleExpiredTicket(ticket); continue }
+        logger.info("Matchmaking Engine: claimed {} ticket(s) for processing", claimedTickets.size)
+            var matchedCount = 0
+            var expiredCount = 0
+            var failedCount = 0
 
-                var joinedMatch = false
-                var nearbyMatches: Page<MatchResponseDTO>
-                val userId = ticket.userId
-                var currentPage = 0
+            for (ticket in claimedTickets) {
+                try {
+                    val outcome = processTicket(ticket)
 
-                do {
-                    val pageable = PageRequest.of(currentPage, 50)
-                    nearbyMatches = obtainNearbyMatchesFromTicket(ticket, pageable)
-
-                    if (tryJoinExistingMatch(nearbyMatches.content, ticket)) { joinedMatch = true; break }
-
-                    currentPage++
-
-                } while (nearbyMatches.hasNext())
-
-                if (!joinedMatch) createFallbackMatch(ticket, userId)
+                    when (outcome) {
+                        ProcessingOutcome.MATCHED -> matchedCount++
+                        ProcessingOutcome.EXPIRED -> expiredCount++
+                        ProcessingOutcome.FAILED -> failedCount++
+                    }
+                } catch (e: Exception) {
+                    failedCount++
+                    logger.error("Matchmaking Engine: failed processing ticket ${ticket.id}: ${e.message}", e)
+                    markTicketAsFailed(ticket)
+                }
             }
-        } catch (e: Exception) {
-            logger.error("Matchmaking Engine encountered an error: ${e.message}", e)
+
+            logger.info(
+                "Matchmaking Engine: completed cycle. claimed={}, matched={}, expired={}, failed={}",
+                claimedTickets.size,
+                matchedCount,
+                expiredCount,
+                failedCount
+            )
         }
+
+    fun claimNextTickets(): List<MatchmakingTicket> {
+        return transactionTemplate.execute {
+            val tickets = ticketRepository.findNextTicketsForProcessing(
+                TicketStatus.SEARCHING,
+                PageRequest.of(0, 25)
+            )
+
+            tickets.forEach { ticket ->
+                ticket.status = TicketStatus.PROCESSING
+            }
+
+            ticketRepository.saveAll(tickets)
+        }
+    }
+
+    private fun processTicket(ticket: MatchmakingTicket): ProcessingOutcome {
+        if (ticket.status != TicketStatus.PROCESSING) {
+            logger.warn(
+                "Matchmaking Engine: skipping ticket {} because status is {}",
+                ticket.id,
+                ticket.status
+            )
+            return ProcessingOutcome.FAILED
+        }
+
+        if (ticket.isExpired(OffsetDateTime.now(clock))) {
+            handleExpiredTicket(ticket)
+            return ProcessingOutcome.EXPIRED
+        }
+
+        var joinedMatch = false
+        var nearbyMatches: Page<MatchResponseDTO>
+        val userId = ticket.userId
+        var currentPage = 0
+
+        do {
+            val pageable = PageRequest.of(currentPage, 50)
+            nearbyMatches = obtainNearbyMatchesFromTicket(ticket, pageable)
+
+            if (tryJoinExistingMatch(nearbyMatches.content, ticket)) {
+                joinedMatch = true
+                break
+            }
+
+            currentPage++
+        } while (nearbyMatches.hasNext())
+
+        if (!joinedMatch) {
+            createFallbackMatch(ticket, userId)
+        }
+
+        return ProcessingOutcome.MATCHED
+    }
+
+    private fun markTicketAsFailed(ticket: MatchmakingTicket) {
+        ticket.status = TicketStatus.FAILED
+        ticketRepository.save(ticket)
     }
 
     private fun tryJoinExistingMatch(

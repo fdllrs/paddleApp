@@ -21,3 +21,7 @@ spring:
 logging:
   level:
     org.springframework.security: DEBUG
+
+app:
+  matchmaking:
+    fixed-delay-ms: 10000

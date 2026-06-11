@@ -33,6 +33,8 @@ interface MatchmakingTicketRepository : JpaRepository<MatchmakingTicket, UUID> {
     // 3. The Anti-Spam Guard
     fun findByUserIdAndStatus(userId: UUID, status: TicketStatus): MatchmakingTicket?
 
+    fun findByUserIdAndStatusIn(userId: UUID, statuses: Collection<TicketStatus>): MatchmakingTicket?
+
     fun findByUserId(userId: UUID): MatchmakingTicket?
 
     fun existsByUserId(userId: UUID): Boolean
