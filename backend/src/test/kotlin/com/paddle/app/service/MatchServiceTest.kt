@@ -1,6 +1,7 @@
 package com.paddle.app.service
 
 import com.paddle.app.dto.MatchCreateRequestDTO
+import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.model.*
 import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
@@ -518,6 +519,129 @@ class MatchServiceTest {
             assertEquals(MatchService.USER_ALREADY_IN_MATCH_MESSAGE, exception.message)
         }
 
+        @Test
+        fun `joinMatch when 4th player joins and preferred court is free`() {
+            val player = testUser()
+            val match = testMatch(status = MatchStatus.OPEN)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            givenMatchExists(match)
+            givenUserExists(player)
+
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 3
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
+            every { matchPlayerRepository.save(any()) } returns mockk()
+            every { matchRepository.save(match) } returns match
+
+            every {
+                matchRepository.overlappingMatchesExcluding(
+                    courtId = match.court.id!!,
+                    excludeMatchId = matchId,
+                    cancelledStatus = MatchStatus.CANCELLED,
+                    startTime = match.startDate,
+                    endTime = match.endDate
+                )
+            } returns emptyList()
+
+            // Act
+            matchService.joinMatch(matchId, playerId)
+
+            // Assert
+            assertTrue { match.isFull() }
+            verify(exactly = 1) { matchPlayerRepository.save(any()) }
+            verify(exactly = 1) { matchRepository.save(match) }
+        }
+
+        @Test
+        fun `joinMatch when 4th player joins and preferred court is booked but alt court is free`() {
+            val player = testUser()
+            val club = testClub()
+            val courtA = testCourt(id = UUID.randomUUID(), club = club)
+            val courtB = testCourt(id = UUID.randomUUID(), club = club)
+            val match = testMatch(status = MatchStatus.OPEN, court = courtA)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            givenMatchExists(match)
+            givenUserExists(player)
+
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 3
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
+            every { matchPlayerRepository.save(any()) } returns mockk()
+            every { matchRepository.save(match) } returns match
+
+            // Court A is booked
+            every {
+                matchRepository.overlappingMatchesExcluding(
+                    courtId = courtA.id!!,
+                    excludeMatchId = matchId,
+                    cancelledStatus = MatchStatus.CANCELLED,
+                    startTime = match.startDate,
+                    endTime = match.endDate
+                )
+            } returns listOf(mockk())
+
+            // Court B is free
+            every {
+                matchRepository.overlappingMatchesExcluding(
+                    courtId = courtB.id!!,
+                    excludeMatchId = matchId,
+                    cancelledStatus = MatchStatus.CANCELLED,
+                    startTime = match.startDate,
+                    endTime = match.endDate
+                )
+            } returns emptyList()
+
+            every { courtRepository.findByClubId(club.id!!) } returns listOf(courtA, courtB)
+
+            // Act
+            matchService.joinMatch(matchId, playerId)
+
+            // Assert
+            assertEquals(courtB.id, match.court.id)
+            assertTrue { match.isFull() }
+            verify(exactly = 1) { matchPlayerRepository.save(any()) }
+            verify(exactly = 1) { matchRepository.save(match) }
+        }
+
+        @Test
+        fun `joinMatch when 4th player joins and all courts are booked throws exception`() {
+            val player = testUser()
+            val club = testClub()
+            val courtA = testCourt(id = UUID.randomUUID(), club = club)
+            val courtB = testCourt(id = UUID.randomUUID(), club = club)
+            val match = testMatch(status = MatchStatus.OPEN, court = courtA)
+            val matchId = requireNotNull(match.id)
+            val playerId = requireNotNull(player.id)
+
+            givenMatchExists(match)
+            givenUserExists(player)
+
+            every { matchPlayerRepository.countByMatchId(matchId) } returns 3
+            every { matchPlayerRepository.findByMatchId(matchId) } returns emptyList()
+
+            // Court A and B are both booked
+            every {
+                matchRepository.overlappingMatchesExcluding(
+                    courtId = any(),
+                    excludeMatchId = matchId,
+                    cancelledStatus = MatchStatus.CANCELLED,
+                    startTime = match.startDate,
+                    endTime = match.endDate
+                )
+            } returns listOf(mockk())
+
+            every { courtRepository.findByClubId(club.id!!) } returns listOf(courtA, courtB)
+
+            // Act & Assert
+            assertThrows<com.paddle.app.exception.AllCourtsBookedException> {
+                matchService.joinMatch(matchId, playerId)
+            }
+
+            verify(exactly = 0) { matchPlayerRepository.save(any()) }
+        }
+
     }
 
     @Nested
@@ -700,6 +824,26 @@ class MatchServiceTest {
         }
 
 
+    }
+
+    @Nested
+    inner class FilterDuoCompatibleMatchesTest {
+        @Test
+        fun `filterDuoCompatibleMatches returns matches with 2 or fewer players`() {
+            val match1 = mockk<MatchResponseDTO> { every { id } returns UUID.randomUUID() } // 1 player
+            val match2 = mockk<MatchResponseDTO> { every { id } returns UUID.randomUUID() } // 2 players
+            val match3 = mockk<MatchResponseDTO> { every { id } returns UUID.randomUUID() } // 3 players
+
+            every { matchPlayerRepository.countByMatchId(match1.id!!) } returns 1
+            every { matchPlayerRepository.countByMatchId(match2.id!!) } returns 2
+            every { matchPlayerRepository.countByMatchId(match3.id!!) } returns 3
+
+            val result = matchService.filterDuoCompatibleMatches(listOf(match1, match2, match3))
+
+            assertEquals(2, result.size)
+            assertTrue { result.contains(match1) }
+            assertTrue { result.contains(match2) }
+        }
     }
 
 }

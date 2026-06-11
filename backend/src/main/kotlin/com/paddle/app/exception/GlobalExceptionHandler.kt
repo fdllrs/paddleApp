@@ -30,4 +30,19 @@ class GlobalExceptionHandler {
     fun handleInvalidOnboard(ex: MethodArgumentNotValidException): ResponseEntity<Map<String, String?>> {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to ex.message))
     }
+
+    @ExceptionHandler(AllCourtsBookedException::class)
+    fun handleAllCourtsBooked(ex: AllCourtsBookedException): ResponseEntity<Map<String, String?>> {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to ex.message))
+    }
+
+    @ExceptionHandler(SecurityException::class)
+    fun handleSecurityException(ex: SecurityException): ResponseEntity<Map<String, String?>> {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(mapOf("error" to ex.message))
+    }
+
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalState(ex: IllegalStateException): ResponseEntity<Map<String, String?>> {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to ex.message))
+    }
 }

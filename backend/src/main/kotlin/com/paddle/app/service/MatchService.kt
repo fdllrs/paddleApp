@@ -4,6 +4,7 @@ import com.paddle.app.dto.MatchCreateRequestDTO
 import com.paddle.app.dto.MatchResponseDTO
 import com.paddle.app.dto.UserResponseDTO
 import com.paddle.app.dto.toResponseDTO
+import com.paddle.app.exception.AllCourtsBookedException
 import com.paddle.app.model.*
 import com.paddle.app.repository.CourtRepository
 import com.paddle.app.repository.MatchPlayerRepository
@@ -112,16 +113,57 @@ class MatchService(
         val user = findUserById(userId)
 
         assertUserNotInMatch(match.id!!, user.id!!)
-
         assertMatchIsNotPlayed(match)
         assertMatchIsNotFull(match)
         assertMatchIsOpen(match)
 
+        val currentPlayersCount = matchPlayerRepository.countByMatchId(matchId)
+        if (currentPlayersCount == 3) {
+            // Joiner is the 4th player! Perform booking check and relocation logic
+            val courtId = match.court.id!!
+            val startTime = match.startDate
+            val endTime = match.endDate
 
-        // 4. Save to the database
+            val overlapping = matchRepository.overlappingMatchesExcluding(
+                courtId = courtId,
+                excludeMatchId = matchId,
+                cancelledStatus = MatchStatus.CANCELLED,
+                startTime = startTime,
+                endTime = endTime
+            )
+
+            if (overlapping.isNotEmpty()) {
+                val clubId = match.court.club.id!!
+                val allCourts = courtRepository.findByClubId(clubId)
+                var relocated = false
+
+                for (altCourt in allCourts) {
+                    if (altCourt.id != courtId) {
+                        val altOverlapping = matchRepository.overlappingMatchesExcluding(
+                            courtId = altCourt.id!!,
+                            excludeMatchId = matchId,
+                            cancelledStatus = MatchStatus.CANCELLED,
+                            startTime = startTime,
+                            endTime = endTime
+                        )
+                        if (altOverlapping.isEmpty()) {
+                            match.court = altCourt
+                            relocated = true
+                            break
+                        }
+                    }
+                }
+
+                if (!relocated) {
+                    throw AllCourtsBookedException("All courts at this club are fully booked for this time slot.")
+                }
+            }
+        }
+
+        // Save to the database
         registerPlayerForMatch(match, user)
 
-        refreshMatchCapacityStatus(match, matchPlayerRepository.countByMatchId(matchId))
+        refreshMatchCapacityStatus(match, currentPlayersCount + 1)
         matchRepository.save(match)
 
     }
@@ -164,7 +206,7 @@ class MatchService(
     fun filterDuoCompatibleMatches(matches: List<MatchResponseDTO>): List<MatchResponseDTO> {
         return matches.filter { match ->
             val matchId = requireNotNull(match.id)
-            numberOfPlayersInMatch(matchId) >= 3
+            numberOfPlayersInMatch(matchId) <= 2
         }
     }
 

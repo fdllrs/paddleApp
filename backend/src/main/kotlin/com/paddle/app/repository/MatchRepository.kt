@@ -39,5 +39,21 @@ interface MatchRepository: JpaRepository<Match, UUID> {
         @Param("newEndTime") newEndTime: OffsetDateTime
     ): List<Match>
 
+    @Query("""
+        SELECT m FROM Match m 
+        WHERE m.court.id = :courtId 
+          AND m.id != :excludeMatchId 
+          AND m.status != :cancelledStatus 
+          AND m.startDate < :endTime 
+          AND m.endDate > :startTime
+    """)
+    fun overlappingMatchesExcluding(
+        @Param("courtId") courtId: UUID,
+        @Param("excludeMatchId") excludeMatchId: UUID,
+        @Param("cancelledStatus") cancelledStatus: MatchStatus,
+        @Param("startTime") startTime: OffsetDateTime,
+        @Param("endTime") endTime: OffsetDateTime
+    ): List<Match>
+
 
 }

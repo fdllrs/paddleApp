@@ -281,4 +281,13 @@ class MatchControllerTest {
         verify { matchService.cancelMatch(matchId, userId) }
 
     }
+
+    @Test
+    fun `GET my-matches returns 403 FORBIDDEN for non-onboarded user`() {
+        mockMvc.perform(
+            get("/api/matches/my-matches")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt().jwt { it.subject("some-firebase-uid") })
+        )
+            .andExpect(status().isForbidden)
+    }
 }
